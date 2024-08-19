@@ -38,8 +38,6 @@ func ConnectMongo(DSNMongo *entities.DSNMongo) *MongoRepository {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Connected to MongoDB!")
-
 	return &MongoRepository{
 		Client:   client,
 		DSNMongo: DSNMongo,

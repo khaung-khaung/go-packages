@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/banyar/go-packages/pkg/common"
 	entities "github.com/banyar/go-packages/pkg/entities"
 
 	"github.com/studio-b12/gowebdav"
@@ -39,7 +38,6 @@ func (r *CloudShareRepository) FindCSVFiles() ([]string, error) {
 	lastModifiedTime := now.Add(-fileAge)
 	// fmt.Println("fileAge ====> ", fileAge)
 	for _, entry := range entries {
-		common.DisplayJsonFormat("Entry", entry)
 
 		// check if the entry is a regular file and has a .csv extension
 		if entry.Type().IsRegular() && filepath.Ext(entry.Name()) == ".csv" {
@@ -184,8 +182,6 @@ func (r *CloudShareRepository) uploadFile(fileName string, remotePath string) er
 	err = r.client.Write(remotePath, fileContent, 0644)
 	if err != nil {
 		fmt.Println("Error uploading file", err.Error())
-	} else {
-		fmt.Println("File uploaded successfully", fileName)
 	}
 	return nil
 }

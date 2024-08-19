@@ -14,8 +14,8 @@ type RabbitMQAdapter struct {
 	Conn            *amqp.Connection
 }
 
-func NewRabbitMQAdapter(DSNMySQL *entities.DSNRabbitMQ) *RabbitMQAdapter {
-	rbqRepo := repositories.ConnectRabbitMQ(DSNMySQL)
+func NewRabbitMQAdapter(DSNMySQL *entities.DSNRabbitMQ, poolSize int) *RabbitMQAdapter {
+	rbqRepo := repositories.ConnectRabbitMQ(DSNMySQL, poolSize)
 	return &RabbitMQAdapter{
 		RabbitMQService: services.NewRabbitMQService(rbqRepo),
 		Conn:            rbqRepo.Conn,
