@@ -14,6 +14,6 @@ func NewRabbitMQService(rbqRepo *repositories.RabbitMQRepository) *rabbitMQServi
 	}
 }
 
-func (r *rabbitMQService) Produce(payload interface{}) (int, string) {
-	return r.RabbitMQRepo.PostMessage(payload)
+func (r *rabbitMQService) Produce(payload interface{}, headers map[string]interface{}) (int, string) {
+	return r.RabbitMQRepo.PostMessage(payload, headers)
 }

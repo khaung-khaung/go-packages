@@ -13,9 +13,9 @@ import (
 
 func TestRabbitProduce(t *testing.T) {
 	DSNRBQ := common.GetDSNRabbitMQ()
-	rbqAdapter := adapters.NewRabbitMQAdapter(&DSNRBQ)
+	rbqAdapter := adapters.NewRabbitMQAdapter(&DSNRBQ, 1)
 	payload := common.GetDynamicPayLoad()
-	statusCode, message := rbqAdapter.RabbitMQService.Produce(payload)
+	statusCode, message := rbqAdapter.RabbitMQService.Produce(payload, map[string]interface{}{})
 	fmt.Println("produce message ", statusCode, message)
 
 }

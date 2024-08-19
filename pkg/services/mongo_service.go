@@ -29,7 +29,6 @@ func (s *MongoService) GetClient() (*mongo.Client, error) {
 		log.Fatal(err)
 		return nil, err
 	}
-	fmt.Println("Connected to MongoDB!")
 	return client, nil
 }
 
