@@ -1,10 +1,18 @@
-/*
-Copyright © 2024 Ba Nyar Si THu <banyar.sithu@frontiir.com>
-*/
 package main
 
-import "fmt"
+import (
+	"log"
+
+	"github.com/joho/godotenv"
+)
+
+func init() {
+	// Load .env before main() runs
+	if err := godotenv.Load(); err != nil {
+		log.Printf("No .env file found: %v", err)
+	}
+}
 
 func main() {
-	fmt.Println("Go Packages")
+
 }

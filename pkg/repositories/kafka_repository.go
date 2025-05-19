@@ -1,129 +1,120 @@
 package repositories
 
-// import (
-// 	"encoding/json"
-// 	"fmt"
-// 	"log"
-// 	"os"
+import (
+	"fmt"
+	"sync"
 
-// 	entities "github.com/banyar/go-packages/pkg/entities"
-// 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-// )
+	entities "github.com/banyar/go-packages/pkg/entities"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+)
 
-// type KafkaRepository struct {
-// 	configMap *kafka.ConfigMap
-// 	dsnKafka  *entities.DSNKafka
-// }
+type KafkaRepository struct {
+	producer *KafkaProducer // Use pointer
+	consumer *KafkaConsumer // Use pointer
+}
 
-// func ConnectKafka(DSNKafka *entities.DSNKafka) *KafkaRepository {
+type KafkaConsumer struct {
+	Client  *kafka.Consumer
+	Mu      sync.RWMutex
+	Running bool
+	Closed  chan struct{} // Add closed channel
+}
 
-// 	config := &kafka.ConfigMap{
-// 		"bootstrap.servers": DSNKafka.Brokers,
-// 		"security.protocol": DSNKafka.Protocol,
-// 		"sasl.mechanism":    DSNKafka.Mechanism,
-// 		"sasl.username":     DSNKafka.User,
-// 		"sasl.password":     DSNKafka.Password,
-// 		"group.id":          DSNKafka.GroupId,
-// 		"auto.offset.reset": "earliest",
-// 	}
+type KafkaProducer struct {
+	Client  *kafka.Producer
+	Running bool
+	Mu      sync.Mutex
+}
 
-// 	return &KafkaRepository{
-// 		configMap: config,
-// 		dsnKafka:  DSNKafka,
-// 	}
-// }
+// ConnectKafka establishes connections using entity configurations
+func ConnectKafka(
+	producerDSN *entities.KafkaProducerDSN,
+	consumerDSN *entities.KafkaConsumerDSN,
+) (*KafkaRepository, error) {
 
-// func (r *KafkaRepository) GetMessage() (string, []kafka.Header) {
-// 	var messageValue string
-// 	var messageHeader []kafka.Header
-// 	consumer, err := kafka.NewConsumer(r.configMap)
-// 	if err != nil {
-// 		fmt.Fprintf(os.Stderr, "Failed to create consumer: %s\n", err)
-// 		os.Exit(1)
-// 		return err.Error(), messageHeader
-// 	}
+	// Create producer config from entities
+	producerConfig := createProducerConfig(producerDSN)
+	producer, err := kafka.NewProducer(producerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create producer: %w", err)
+	}
 
-// 	consumer.SubscribeTopics([]string{r.dsnKafka.Topics}, nil)
-// 	run := true
+	// Create consumer config from entities
+	consumerConfig := createConsumerConfig(consumerDSN)
+	consumer, err := kafka.NewConsumer(consumerConfig)
+	if err != nil {
+		producer.Close()
+		return nil, fmt.Errorf("failed to create consumer: %w", err)
+	}
 
-// 	for run {
-// 		ev := consumer.Poll(100)
-// 		switch e := ev.(type) {
-// 		case *kafka.Message:
-// 			messageValue = string(e.Value)
-// 			fmt.Printf("Message on %s: %s\n", e.TopicPartition, string(e.Value))
-// 			if e.Headers != nil {
-// 				fmt.Printf("Headers: %v\n", e.Headers)
-// 				messageHeader = e.Headers
-// 			}
+	return &KafkaRepository{
+		producer: &KafkaProducer{
+			Client:  producer,
+			Running: true,
+		},
+		consumer: &KafkaConsumer{
+			Client:  consumer,
+			Running: true,
+			Closed:  make(chan struct{}), // Initialize closed channel
 
-// 		case kafka.Error:
-// 			fmt.Fprintf(os.Stderr, "%% Error: %v\n", e)
-// 			run = false
-// 			messageValue = e.Error()
-// 		default:
-// 			// fmt.Printf("Ignored %v\n", e)
-// 		}
-// 	}
+		},
+	}, nil
+}
 
-// 	consumer.Close()
-// 	return messageValue, messageHeader
+func (r *KafkaRepository) Producer() *KafkaProducer {
+	return r.producer
+}
 
-// }
+func (r *KafkaRepository) Consumer() *KafkaConsumer {
+	return r.consumer
+}
 
-// func (r *KafkaRepository) PostMessage(payloadObj interface{}) (int, string, kafka.TopicPartition) {
+// Helper functions to create configs from entity structs
+func createProducerConfig(dsn *entities.KafkaProducerDSN) *kafka.ConfigMap {
+	return &kafka.ConfigMap{
+		"bootstrap.servers": dsn.Brokers,
+		"client.id":         dsn.ClientID,
+		"security.protocol": dsn.Protocol,
+		"sasl.mechanism":    dsn.Mechanism,
+		"sasl.username":     dsn.Username,
+		"sasl.password":     dsn.Password,
+		"acks":              dsn.Acks,
+		"retries":           dsn.Retries,
+		"compression.type":  dsn.Compression,
+	}
+}
 
-// 	// Produce messages to topic (asynchronously)
-// 	payload, err := json.Marshal(payloadObj)
-// 	jsonString := string(payload)
+func createConsumerConfig(dsn *entities.KafkaConsumerDSN) *kafka.ConfigMap {
+	return &kafka.ConfigMap{
+		"bootstrap.servers":  dsn.Brokers,
+		"group.id":           dsn.GroupID,
+		"client.id":          dsn.ClientID,
+		"security.protocol":  dsn.Protocol,
+		"sasl.mechanism":     dsn.Mechanism,
+		"sasl.username":      dsn.Username,
+		"sasl.password":      dsn.Password,
+		"auto.offset.reset":  dsn.AutoOffset,
+		"enable.auto.commit": false,
+	}
+}
 
-// 	// fmt.Println("PayLoad Json", jsonString)
-// 	if err != nil {
-// 		log.Fatalf("Error converting struct to JSON: %s", err)
-// 	}
-// 	p, err := kafka.NewProducer(r.configMap)
-// 	if err != nil {
-// 		panic(err)
-// 	}
+// Close safely shuts down connections
+func (kr *KafkaRepository) ProducerClose() {
+	kr.producer.Mu.Lock()
+	defer kr.producer.Mu.Unlock()
+	if kr.producer.Running {
+		kr.producer.Client.Close()
+		kr.producer.Running = false
+	}
+}
 
-// 	var topicPartition kafka.TopicPartition
-// 	var statusMessage string
-// 	var statusCode int = 0
+func (kr *KafkaRepository) ConsumerClose() {
+	kr.consumer.Mu.Lock()
+	defer kr.consumer.Mu.Unlock()
 
-// 	defer p.Close()
-
-// 	// Delivery report handler for produced messages
-// 	go func() {
-// 		for e := range p.Events() {
-// 			switch ev := e.(type) {
-// 			case *kafka.Message:
-// 				if ev.TopicPartition.Error != nil {
-// 					// fmt.Printf("Delivery failed: %v\n", ev.TopicPartition)
-// 					statusCode = 500
-// 					statusMessage = "Delivery failed"
-// 					topicPartition = ev.TopicPartition
-// 				} else {
-// 					// fmt.Printf("Delivered message to %v\n", ev.TopicPartition)
-// 					statusCode = 200
-// 					statusMessage = "Delivered success"
-// 					topicPartition = ev.TopicPartition
-// 				}
-// 			}
-// 		}
-// 	}()
-
-// 	for _, word := range []string{jsonString} {
-// 		p.Produce(&kafka.Message{
-// 			TopicPartition: kafka.TopicPartition{Topic: &r.dsnKafka.Topics, Partition: kafka.PartitionAny},
-// 			Value:          []byte(word),
-// 			Headers: []kafka.Header{
-// 				{Key: "group_id", Value: []byte(r.dsnKafka.GroupId)}, // we will decide later for header value set
-// 			},
-// 		}, nil)
-// 	}
-
-// 	// Wait for message deliveries before shutting down
-// 	p.Flush(15 * 1000)
-
-// 	return statusCode, statusMessage, topicPartition
-// }
+	if kr.consumer.Running {
+		close(kr.consumer.Closed) // Signal closure
+		kr.consumer.Client.Close()
+		kr.consumer.Running = false
+	}
+}
