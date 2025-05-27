@@ -16,5 +16,4 @@ func NewMongoAdapter(DSNMongo *entities.DSNMongo) *MongoAdapter {
 	return &MongoAdapter{
 		MongoService: services.NewMongoService(databaseRepo),
 	}
-
 }

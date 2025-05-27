@@ -12,7 +12,7 @@ type KafkaCommonDSN struct {
 type KafkaProducerDSN struct {
 	KafkaCommonDSN        // Embedded common configuration
 	Acks           string // Acknowledgement mode (e.g., "all")
-	Retries        int    // Number of retries for failed sends
+	Retries        string // Number of retries for failed sends
 	Compression    string // Compression type (e.g., "snappy")
 }
 
@@ -20,5 +20,5 @@ type KafkaConsumerDSN struct {
 	KafkaCommonDSN        // Embedded common configuration
 	GroupID        string // Consumer group identifier
 	AutoOffset     string // Offset reset policy (e.g., "earliest")
-	AutoCommit     bool   // Enable/disable auto-commit of offsets
+	AutoCommit     string // Enable/disable auto-commit of offsets
 }

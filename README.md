@@ -12,25 +12,6 @@ make test TEST_FUNC=TestSMTPSend
 make test TEST_FUNC=TestPlanSummary
 make test TEST_FUNC=TestPlanDetail
 
-Access Kafka UI:
-Go to http://localhost:9999 → Topics → Create Topic.
-
-field	Value	Description
-Topic Name	fibermaps	The name of the topic.
-Number of Partitions	2	Allows parallel processing and scaling.
-Cleanup Policy	Delete	Automatically deletes old messages.
-Min In Sync Replicas	1	Minimum number of replicas that must be in sync.
-Replication Factor	2	Number of copies of the data for fault tolerance.
-Time to Retain Data	7 days	How long messages are stored.
-Max Size on Disk in GB	Not Set	Unlimited by default.
-Maximum Message Size (Bytes)	1048576	1 MB (default, can be adjusted if needed).
-Custom Parameters	retention.ms=604800000	7 days in milliseconds.
-
-docker network inspect go-packages_app-network | grep kafka -A 5 
-
-docker inspect kafka | grep -A 5 Networks
-
-docker inspect kafka | grep Networks -A 5
 
 
 

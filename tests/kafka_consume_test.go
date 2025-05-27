@@ -14,16 +14,16 @@ import (
 )
 
 func TestKafkaConsume(t *testing.T) {
-	producerDSN := common.ProducerDSNFromEnv()
 	consumerDSN := common.ConsumerDSNFromEnv()
 
-	kafkaAdapter := adapters.NewKafkaAdapter(producerDSN, consumerDSN)
+	kafkaAdapter := adapters.NewKafkaAdapter()
 	defer kafkaAdapter.KafkaRepo.ConsumerClose()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	consumer := kafkaAdapter.KafkaRepo.Consumer()
+	kafkaAdapter.KafkaRepo.ConnectConsumer(consumerDSN)
+	consumer := kafkaAdapter.KafkaRepo.GetConsumer()
 
 	// Use wait group for proper synchronization
 	var wg sync.WaitGroup

@@ -19,10 +19,9 @@ import (
 func TestKafkaProduce(t *testing.T) {
 
 	producerDSN := common.ProducerDSNFromEnv()
-	consumerDSN := common.ConsumerDSNFromEnv()
 
 	// Create adapter with error handling
-	kafkaAdapter := adapters.NewKafkaAdapter(producerDSN, consumerDSN)
+	kafkaAdapter := adapters.NewKafkaAdapter()
 
 	// Defer close immediately after successful creation
 	defer func() {
@@ -30,9 +29,9 @@ func TestKafkaProduce(t *testing.T) {
 	}()
 
 	// Access producer safely
-	producerClient := kafkaAdapter.KafkaRepo.Producer()
+	kafkaAdapter.KafkaRepo.ConnectProducer(producerDSN)
+	producer := kafkaAdapter.KafkaRepo.GetProducer()
 
-	// Example usage
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -56,7 +55,7 @@ func TestKafkaProduce(t *testing.T) {
 		{Key: "Event-Type", Value: []byte("order.created")},
 	}
 
-	err = SendMessage(producerClient, ctx, os.Getenv("KAFKA_TOPIC"), []byte(jsonString), headers)
+	err = SendMessage(producer, ctx, os.Getenv("KAFKA_TOPIC"), []byte(jsonString), headers)
 	if err != nil {
 		log.Printf("Failed to send message: %v", err)
 	}

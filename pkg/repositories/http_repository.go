@@ -36,7 +36,7 @@ func (s *HttpRepository) GetHttpPayload(payloadObj interface{}) (*bytes.Buffer, 
 func (s *HttpRepository) GetHttpRequest(method string, payloadObj io.Reader) (*http.Request, error) {
 
 	req, err := http.NewRequest(method, s.baseURL, payloadObj)
-
+	fmt.Println("HTTP REQUEST", req)
 	if err != nil {
 		fmt.Println("ERROR", err.Error())
 		return nil, err
