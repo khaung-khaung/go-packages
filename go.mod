@@ -2,6 +2,8 @@ module github.com/banyar/go-packages
 
 go 1.22.0
 
+replace git.frontiir.net/sa-dev/log-package => /home/banyar-sithu/FrontiirProjects/extensions/log-package
+
 require (
 	github.com/gocarina/gocsv v0.0.0-20240520201108-78e41c74b4b1
 	github.com/joho/godotenv v1.5.1
@@ -13,10 +15,15 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	golang.org/x/net v0.23.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
 )
 
-require golang.org/x/exp v0.0.0-20230905200255-921286631fa9
+require (
+	git.frontiir.net/sa-dev/log-package v1.0.0
+	go.uber.org/zap v1.27.0
+	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
+)
 
 require (
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
@@ -30,7 +37,7 @@ require (
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	golang.org/x/crypto v0.22.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 )

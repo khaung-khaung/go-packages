@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"strings"
 
+	"git.frontiir.net/sa-dev/log-package/pkg/frontlog"
 	entities "github.com/banyar/go-packages/pkg/entities"
+	"go.uber.org/zap"
 )
 
 type HttpRepository struct {
@@ -69,7 +71,7 @@ func (s *HttpRepository) RequestMethod(method string) string {
 func (s *HttpRepository) GetHttpResponse(req *http.Request) (*entities.HttpResponse, error) {
 	// Create a new http.Client object
 	client := &http.Client{
-		Timeout: 10, // Use configured timeout
+		// Timeout: 10000, // Use configured timeout
 	}
 	// Set the Authorization header
 	for k, v := range s.extraHeaders {
@@ -109,36 +111,29 @@ func (s *HttpRepository) GetHttpResponse(req *http.Request) (*entities.HttpRespo
 }
 
 func (s *HttpRepository) logResponse(resp *http.Response) {
-	// Create log string builder
-	var logBuilder strings.Builder
-
-	// Add status info
-	fmt.Fprintf(&logBuilder, "\n[HTTP RESPONSE LOG]\n")
-	fmt.Fprintf(&logBuilder, "Status: %s\n", resp.Status)
-	fmt.Fprintf(&logBuilder, "StatusCode: %d\n", resp.StatusCode)
-
-	// Add headers
-	fmt.Fprintf(&logBuilder, "Headers:\n")
-	for key, values := range resp.Header {
-		for _, value := range values {
-			// Redact sensitive headers
-			if strings.EqualFold(key, "Authorization") {
-				value = "[REDACTED]"
-			}
-			fmt.Fprintf(&logBuilder, "  %s: %s\n", key, value)
-		}
-	}
-
-	// Add body preview
-	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024)) // Read first 1KB
+	// Read body preview (max 1KB)
+	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 	resp.Body = io.NopCloser(io.MultiReader(
 		bytes.NewReader(bodyBytes),
 		resp.Body,
 	))
 
-	fmt.Fprintf(&logBuilder, "Body Preview (first 1KB):\n%s\n", string(bodyBytes))
-	fmt.Fprintf(&logBuilder, "[END RESPONSE LOG]\n")
+	// Prepare headers map
+	headers := make(map[string]string)
+	for key, values := range resp.Header {
+		for _, value := range values {
+			if strings.EqualFold(key, "Authorization") {
+				value = "[REDACTED]"
+			}
+			headers[key] = value
+		}
+	}
 
-	// Print to console or send to logger
-	fmt.Println(logBuilder.String())
+	// Log with zap
+	frontlog.Logger.Info("[HTTP RESPONSE]",
+		zap.String("status", resp.Status),
+		zap.Int("status_code", resp.StatusCode),
+		zap.Any("headers", headers),
+		// zap.String("body_preview", string(bodyBytes)),
+	)
 }
