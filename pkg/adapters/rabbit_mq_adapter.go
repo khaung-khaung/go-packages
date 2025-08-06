@@ -6,16 +6,16 @@ import (
 	"github.com/banyar/go-packages/pkg/repositories"
 	"github.com/banyar/go-packages/pkg/services"
 
-	"github.com/streadway/amqp"
+	"github.com/rabbitmq/amqp091-go"
 )
 
 type RabbitMQAdapter struct {
 	RabbitMQService interfaces.IRabbitMQService
-	Conn            *amqp.Connection
+	Conn            *amqp091.Connection
 }
 
-func NewRabbitMQAdapter(DSNMySQL *entities.DSNRabbitMQ, poolSize int) *RabbitMQAdapter {
-	rbqRepo := repositories.ConnectRabbitMQ(DSNMySQL, poolSize)
+func NewRabbitMQAdapter(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQAdapter {
+	rbqRepo := repositories.ConnectRabbitMQ(DSNRBQ, poolSize)
 	return &RabbitMQAdapter{
 		RabbitMQService: services.NewRabbitMQService(rbqRepo),
 		Conn:            rbqRepo.Conn,
