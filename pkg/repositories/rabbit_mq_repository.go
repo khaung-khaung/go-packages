@@ -222,7 +222,6 @@ func (r *RabbitMQRepository) PostMessage(payloadObj interface{}, headers map[str
 		return 500, "Error converting struct to JSON"
 	}
 
-	time.Sleep(2 * time.Second)
 	switch atomic.LoadInt32(&r.netErrFlag) {
 	case 1:
 		log.Println("RabbitMQ disconnected")
@@ -242,7 +241,6 @@ func (r *RabbitMQRepository) PostMessage(payloadObj interface{}, headers map[str
 		if err != nil {
 			return 500, err.Error()
 		}
-		time.Sleep(2 * time.Second)
 
 		// Publish message
 		err = ch.Publish(
