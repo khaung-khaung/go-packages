@@ -14,8 +14,19 @@ type Item struct {
 	Link     string
 }
 
+type ClosedItem struct {
+	Status string
+	Count  int
+}
+
 // EmailData represents the data to be used in the email template
 type EmailData struct {
 	Title string
 	Items []Item
+}
+
+// EmailData represents the data to be used in the email template
+type EmailClosedData struct {
+	Title       string
+	ClosedItems []ClosedItem
 }

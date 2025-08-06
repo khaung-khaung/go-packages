@@ -1,19 +1,17 @@
 package adapters
 
-// import (
-// 	entities "github.com/banyar/go-packages/pkg/entities"
-// 	"github.com/banyar/go-packages/pkg/interfaces"
-// 	"github.com/banyar/go-packages/pkg/repositories"
-// 	"github.com/banyar/go-packages/pkg/services"
-// )
+import (
+	entities "github.com/banyar/go-packages/pkg/entities"
+	"github.com/banyar/go-packages/pkg/repositories"
+)
 
-// type KafkaAdapter struct {
-// 	KafkaService interfaces.IKafkaService
-// }
+type KafkaAdapter struct {
+	KafkaRepo *repositories.KafkaRepository
+}
 
-// func NewKafkaAdapter(DSNKafka *entities.DSNKafka) *KafkaAdapter {
-// 	kafkaRepo := repositories.ConnectKafka(DSNKafka)
-// 	return &KafkaAdapter{
-// 		KafkaService: services.NewKafkaService(kafkaRepo),
-// 	}
-// }
+func NewKafkaAdapter(kafkaProducer *entities.KafkaProducerDSN, kafkaConsumer *entities.KafkaConsumerDSN) *KafkaAdapter {
+	kafkaRepo, _ := repositories.ConnectKafka(kafkaProducer, kafkaConsumer)
+	return &KafkaAdapter{
+		KafkaRepo: kafkaRepo,
+	}
+}

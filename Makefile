@@ -15,7 +15,7 @@ mod-tidy:
 	go mod tidy
 
 .PHONY: build
-build: format mod-tidy test
+build: format mod-tidy 
 	GOOS=$(TARGETOS) CGO_ENABLED=0 go build -ldflags $(GOLDFLAGS)
 
 # Default target

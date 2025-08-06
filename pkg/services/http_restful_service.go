@@ -19,12 +19,13 @@ func NewHttpService(http *repositories.HttpRepository) *HttpService {
 }
 
 func (s *HttpService) Get() (*entities.HttpResponse, error) {
+
 	req, err := s.HTTP.GetHttpRequest(http.MethodGet, nil)
 	if err != nil {
 		fmt.Println("ERROR", err.Error())
 		return nil, err
 	}
-	httpResp, err := s.HTTP.GetHttpRespnse(req)
+	httpResp, err := s.HTTP.GetHttpResponse(req)
 	if err != nil {
 		fmt.Println("ERROR", err.Error())
 		return nil, err
@@ -41,7 +42,7 @@ func (s *HttpService) Update(method string, payloadObj interface{}) (*entities.H
 	if err != nil {
 		return nil, err
 	}
-	httpResp, err := s.HTTP.GetHttpRespnse(req)
+	httpResp, err := s.HTTP.GetHttpResponse(req)
 	if err != nil {
 		return nil, err
 	}

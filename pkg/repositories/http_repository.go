@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	entities "github.com/banyar/go-packages/pkg/entities"
 )
@@ -33,6 +34,7 @@ func (s *HttpRepository) GetHttpPayload(payloadObj interface{}) (*bytes.Buffer, 
 }
 
 func (s *HttpRepository) GetHttpRequest(method string, payloadObj io.Reader) (*http.Request, error) {
+
 	req, err := http.NewRequest(method, s.baseURL, payloadObj)
 
 	if err != nil {
@@ -50,9 +52,11 @@ func (s *HttpRepository) RequestMethod(method string) string {
 	return requestMethod[strings.ToUpper(method)]
 }
 
-func (s *HttpRepository) GetHttpRespnse(req *http.Request) (*entities.HttpResponse, error) {
+func (s *HttpRepository) GetHttpResponse(req *http.Request) (*entities.HttpResponse, error) {
 	// Create a new http.Client object
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 20 * time.Second, // Set timeout here
+	}
 
 	// Set the Authorization header
 	req.Header.Add("Authorization", s.token)
@@ -68,6 +72,7 @@ func (s *HttpRepository) GetHttpRespnse(req *http.Request) (*entities.HttpRespon
 	var httpResponse *entities.HttpResponse
 	// Get the response body
 	body, err := io.ReadAll(resp.Body)
+
 	if err != nil {
 		fmt.Println("ERROR", err.Error())
 		return nil, err
