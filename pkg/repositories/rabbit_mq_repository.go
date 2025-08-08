@@ -52,12 +52,38 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 	user := DSNRBQ.User
 	pass := DSNRBQ.Password
 	vhost := DSNRBQ.VirtualHost
+	uri := fmt.Sprintf("amqp://%s:%s@%s:%d%s", user, pass, host, port, vhost)
+	retryCount := 0
+	delay := time.Second
+
+	var conn *amqp091.Connection
+	var err error
 
 	// Connect to server
-	uri := fmt.Sprintf("amqp://%s:%s@%s:%d%s", user, pass, host, port, vhost)
-	conn, err := amqp091.Dial(uri)
-	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+	for {
+		conn, err = amqp091.Dial(uri)
+		if err == nil {
+			break
+		} else {
+			if retryCount == 0 {
+				log.Printf("Failed to connect to RabbitMQ: %v", err)
+			}
+			if !isNetworkError(err) {
+				log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+			}
+		}
+
+		if retryCount == 6 {
+			log.Fatalln("RabbitMQ connection max retries reached")
+		}
+		retryCount++
+
+		time.Sleep(delay)
+		delay *= 2
+		if delay > 16*time.Second {
+			delay = 16 * time.Second
+		}
+		log.Printf("Retry %d\n", retryCount)
 	}
 
 	repo := &RabbitMQRepository{
