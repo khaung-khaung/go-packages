@@ -32,13 +32,15 @@ func ConnectMongo(DSNMongo *entities.DSNMongo) *MongoRepository {
 	)
 
 	// Configure client options
-	clientOptions := options.Client().
-		ApplyURI(mongoURI).
-		SetAuth(options.Credential{
-			AuthMechanism: "SCRAM-SHA-256",
-			Username:      DSNMongo.Username,
-			Password:      DSNMongo.Password,
-		})
+	clientOptions := options.Client().ApplyURI(mongoURI)
+
+	// clientOptions := options.Client().
+	// 	ApplyURI(mongoURI).
+	// 	SetAuth(options.Credential{
+	// 		AuthMechanism: "SCRAM-SHA-256",
+	// 		Username:      DSNMongo.Username,
+	// 		Password:      DSNMongo.Password,
+	// 	})
 
 	// Connect to MongoDB
 	client, err := mongo.Connect(ctx, clientOptions)
