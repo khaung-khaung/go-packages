@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/banyar/go-packages/pkg/adapters"
 	"github.com/banyar/go-packages/pkg/common"
+	"github.com/banyar/go-packages/pkg/frontlog"
 	"github.com/banyar/go-packages/pkg/repositories"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"go.uber.org/zap"
@@ -51,7 +51,7 @@ func TestKafkaProduce(t *testing.T) {
 	// Produce messages to topic (asynchronously)
 	payload, err := json.Marshal(payloadObj)
 	if err != nil {
-		log.Fatalf("Error converting struct to JSON: %s", err)
+		frontlog.Logger.Error("Error converting struct to JSON", zap.Any(":", err))
 	}
 	jsonString := string(payload)
 
@@ -63,7 +63,8 @@ func TestKafkaProduce(t *testing.T) {
 
 	err = SendMessage(producer, ctx, os.Getenv("KAFKA_TOPIC"), []byte(jsonString), headers)
 	if err != nil {
-		log.Printf("Failed to send message: %v", err)
+
+		frontlog.Logger.Error("Failed to send message", zap.Any(":", err))
 	}
 
 }
@@ -103,7 +104,9 @@ func SendMessage(kp *repositories.KafkaProducer, ctx context.Context, topic stri
 		if msg.TopicPartition.Error != nil {
 			return fmt.Errorf("delivery failed: %w", msg.TopicPartition.Error)
 		}
-		log.Printf("Delivered message to %v", msg.TopicPartition)
+
+		frontlog.Logger.Info("", zap.Any("Delivered message", msg.TopicPartition))
+
 		return nil
 	}
 }

@@ -2,7 +2,6 @@ package tests
 
 import (
 	"fmt"
-	"log"
 
 	"os"
 	"strconv"
@@ -12,6 +11,8 @@ import (
 	"github.com/banyar/go-packages/pkg/adapters"
 	"github.com/banyar/go-packages/pkg/common"
 	"github.com/banyar/go-packages/pkg/entities"
+	"github.com/banyar/go-packages/pkg/frontlog"
+	"go.uber.org/zap"
 
 	"github.com/gocarina/gocsv"
 	"github.com/joho/godotenv"
@@ -30,9 +31,9 @@ var (
 func init() {
 	err := godotenv.Load("../.env")
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		frontlog.Logger.Error("Error loading .env file :", zap.Any("error=", err))
 	}
-	fmt.Println("config.init()")
+	frontlog.Logger.Info("config.init()")
 }
 
 func TestCSVDownload(t *testing.T) {
@@ -42,12 +43,12 @@ func TestCSVDownload(t *testing.T) {
 	resp, err := cloudShareAdapter.CloudShareService.Download()
 
 	if err != nil {
-		log.Fatal("ERROR : ", err)
+		frontlog.Logger.Error("Error :", zap.Any("", err))
 	}
 
 	csv, err := cloudShareAdapter.CloudShareService.Get()
 	if err != nil {
-		log.Fatal("ERROR : ", err)
+		frontlog.Logger.Error("Error :", zap.Any("", err))
 	}
 	common.DisplayJsonFormat("cloudShareAdapter ", resp)
 	common.DisplayJsonFormat("csv files ", csv)
@@ -59,7 +60,7 @@ func TestGetCSVFile(t *testing.T) {
 	cloudShareAdapter := adapters.NewCloudShareAdapter(&DSNCloudShare)
 	csv, err := cloudShareAdapter.CloudShareService.Get()
 	if err != nil {
-		log.Fatal("ERROR : ", err)
+		frontlog.Logger.Error("Error :", zap.Any("", err))
 	}
 	common.DisplayJsonFormat("csv files ", csv)
 }
@@ -86,12 +87,14 @@ func TestCSVUpload(t *testing.T) {
 func GetDSNCloudShare() entities.DSNCloudShare {
 	fileAge, err := time.ParseDuration(os.Getenv("FILE_AGE"))
 	if err != nil {
-		log.Fatalf("Error converting FILE_AGE to time duration: %v", err)
+
+		frontlog.Logger.Error("converting FILE_AGE to time duration :", zap.Any("", err))
 	}
 	fileAgeOn, err := strconv.ParseBool(os.Getenv("FILE_AGE_ON"))
 
 	if err != nil {
-		log.Fatalf("Error converting FILE_AGE to bool: %v", err)
+
+		frontlog.Logger.Error("Error converting FILE_AGE to bool :", zap.Any("", err))
 	}
 
 	return entities.DSNCloudShare{
@@ -113,17 +116,19 @@ func DumpCSVfile[T any](fileName string, itemList []T) (string, error) {
 	DTFormatFilename := "2006-01-02"
 	appStartTime := startTime.Format(DTFormatFilename)
 	fullFileName := fmt.Sprintf("%s-%s", appStartTime, fileName)
-	fmt.Println("Full File Name", fullFileName)
+
+	frontlog.Logger.Info("Full File Name :", zap.Any("", fullFileName))
 
 	outputPath := fmt.Sprintf("%s/dump", DSNCloudShare.OutputFilePath)
 	if err := common.EnsureOutputFolderExists(outputPath); err != nil {
-		fmt.Println("csv_write error", err.Error())
+		frontlog.Logger.Error("csv_write error :", zap.Any("", err.Error()))
 		return "", err
 	}
 	csvFileFullPath := fmt.Sprintf("%s/%s", outputPath, fullFileName)
 	csvContent, err := gocsv.MarshalString(&itemList)
 	if err != nil {
-		fmt.Println("csv_write error", err.Error())
+
+		frontlog.Logger.Error("csv_write error :", zap.Any("", err.Error()))
 		return "", err
 	}
 	// Write the CSV content to a file
@@ -135,7 +140,7 @@ func DumpCSVfile[T any](fileName string, itemList []T) (string, error) {
 	defer file.Close()
 	_, err = file.WriteString(csvContent)
 	if err != nil {
-		fmt.Println("csv_write error", err.Error())
+		frontlog.Logger.Error("csv_write error :", zap.Any("", err.Error()))
 		return "", err
 	}
 	return csvFileFullPath, nil
@@ -155,8 +160,10 @@ func UploadCsvToCloudShare(fileNameList []string) {
 	successList, failList, err := cloudShareAdapter.CloudShareService.Upload(fileNameList, cloudShareUploadFullPath)
 
 	if err != nil {
-		fmt.Println("csv upload error", err.Error())
+		frontlog.Logger.Error("csv upload error :", zap.Any("", err.Error()))
 	}
-	fmt.Println("Success List", successList)
-	fmt.Println("Failed List", failList)
+
+	frontlog.Logger.Info("Success List :", zap.Any("", successList))
+	frontlog.Logger.Info("Failed List :", zap.Any("", failList))
+
 }

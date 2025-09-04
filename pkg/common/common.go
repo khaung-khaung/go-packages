@@ -3,7 +3,6 @@ package common
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"reflect"
 	"strconv"
@@ -11,6 +10,8 @@ import (
 	"time"
 
 	"github.com/banyar/go-packages/pkg/entities"
+	"github.com/banyar/go-packages/pkg/frontlog"
+	"go.uber.org/zap"
 
 	"golang.org/x/exp/rand"
 )
@@ -24,12 +25,20 @@ func DisplayJsonFormat(message string, class interface{}) {
 	}
 	p, err := json.Marshal(class)
 	LogError(err)
-	log.Println(message+" ===>", string(p))
+
+	frontlog.Logger.Info(
+		message,
+		zap.Any("", p),
+	)
+
 }
 
 func LogError(err error) {
 	if err != nil {
-		log.Fatal("ERROR : ", err)
+		frontlog.Logger.Error(
+			"ERROR",
+			zap.Any(":", err),
+		)
 	}
 }
 
@@ -127,7 +136,10 @@ func TimestampString() string {
 
 func FailOnError(err error, msg string) {
 	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
+		frontlog.Logger.Error(
+			msg,
+			zap.Any(":", err),
+		)
 	}
 }
 
@@ -209,14 +221,21 @@ func GetDynamicPayLoad() interface{} {
 
 	// Create and set the struct
 	dynamicStruct := CreateAndSetStruct(fields, values)
-	fmt.Printf("Dynamic Struct: %+v\n", dynamicStruct)
+	frontlog.Logger.Info(
+		"Dynamic Struct:",
+		zap.Any("-", dynamicStruct),
+	)
+
 	return dynamicStruct
 }
 
 func GetDSNRabbitMQ() entities.DSNRabbitMQ {
 	rbqPort, err := strconv.Atoi(os.Getenv("RABBIT_MQ_PORT"))
 	if err != nil {
-		log.Fatalf("Error converting RBQ to integer: %v", err)
+		frontlog.Logger.Info(
+			"Error converting RBQ to integer:",
+			zap.Any("err", err),
+		)
 	}
 	return entities.DSNRabbitMQ{
 		Host:         os.Getenv("RABBIT_MQ_HOST"),
@@ -235,7 +254,10 @@ func GetDSNRabbitMQ() entities.DSNRabbitMQ {
 func GetDSNRabbitMQ1() entities.DSNRabbitMQ {
 	rbqPort, err := strconv.Atoi(os.Getenv("RABBIT_MQ_PORT1"))
 	if err != nil {
-		log.Fatalf("Error converting RBQ to integer: %v", err)
+		frontlog.Logger.Info(
+			"Error converting RBQ to integer:",
+			zap.Any("err", err),
+		)
 	}
 	return entities.DSNRabbitMQ{
 		Host:         os.Getenv("RABBIT_MQ_HOST"),

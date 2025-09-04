@@ -80,6 +80,7 @@ func FormatJSON(message string, v interface{}) string {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		log.Printf("Error formatting JSON: %v", err)
+
 		return fmt.Sprintf("Error formatting JSON: %v", err)
 	}
 
