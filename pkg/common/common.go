@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/banyar/go-packages/pkg/entities"
@@ -55,14 +56,67 @@ func EnsureOutputFolderExists(folderPath string) error {
 	return nil
 }
 
-func PreparePayload() entities.CustomPublish {
+type UnitConfig struct {
+	Prefix    string
+	Suffix    string
+	Separator string
+	AddRandom bool
+}
+
+func GenerateUnitName(data string, config UnitConfig) string {
+	timestampStr := TimestampString()
+
+	parts := []string{}
+
+	if config.Prefix != "" {
+		parts = append(parts, config.Prefix)
+	}
+
+	parts = append(parts, data)
+	parts = append(parts, timestampStr)
+
+	if config.Suffix != "" {
+		parts = append(parts, config.Suffix)
+	}
+
+	if config.AddRandom {
+		randomStr := GenerateRandomString(4)
+		parts = append(parts, randomStr)
+	}
+
+	separator := config.Separator
+	if separator == "" {
+		separator = "_"
+	}
+
+	return strings.Join(parts, separator)
+}
+
+func GenerateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func PreparePayload(data string) entities.CustomPublish {
 	// Payload
 	timestampStr := TimestampString()
-	fmt.Println("Timestamp String:", timestampStr)
-
+	config := UnitConfig{Prefix: "unit", Suffix: "prod", Separator: "-", AddRandom: true}
+	unitName := GenerateUnitName(data, config)
 	publish := entities.CustomPublish{
-		Name:  "super",
-		Email: "test@gmail.com",
+		Name:      fmt.Sprintf("user_%s_%s", unitName, timestampStr),
+		Email:     fmt.Sprintf("%s.%s@gmail.com", data, timestampStr),
+		Timestamp: timestampStr,
+		UserID:    fmt.Sprintf("usr_%d", time.Now().UnixNano()),
+		IsActive:  true,
+		CreatedAt: time.Now(),
+		Metadata: map[string]interface{}{
+			"source":  "dynamic_generator",
+			"version": "1.0",
+		},
 	}
 	return publish
 }

@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	"git.frontiir.net/sa-dev/log-package/pkg/frontlog"
 	entities "github.com/banyar/go-packages/pkg/entities"
+	"github.com/banyar/go-packages/pkg/frontlog"
 	"go.uber.org/zap"
 )
 
@@ -73,6 +73,7 @@ func (s *HttpRepository) GetHttpResponse(req *http.Request) (*entities.HttpRespo
 	client := &http.Client{
 		// Timeout: 10000, // Use configured timeout
 	}
+
 	// Set the Authorization header
 	for k, v := range s.extraHeaders {
 		req.Header.Add(k, v)
