@@ -7,16 +7,22 @@ import (
 )
 
 type HttpRestfulAdapter struct {
-	HttpService interfaces.IHttpService
-	BaseURL     string
-	Token       string
+	HttpService  interfaces.IHttpService
+	BaseURL      string
+	ExtraHeaders map[string]string
 }
 
-func NewHttpAdapter(baseURL string, token string) *HttpRestfulAdapter {
-	http := repositories.ConnectRest(baseURL, token)
+// NewHttpAdapter implementation
+func NewHttpAdapter(baseURL string, extraHeaders map[string]string) *HttpRestfulAdapter {
+	// Create HttpRepository with headers
+	repo := repositories.ConnectRest(
+		baseURL,
+		repositories.WithExtraHeaders(extraHeaders),
+	)
+
 	return &HttpRestfulAdapter{
-		HttpService: services.NewHttpService(http),
-		BaseURL:     baseURL,
-		Token:       token,
+		HttpService:  services.NewHttpService(repo),
+		BaseURL:      baseURL,
+		ExtraHeaders: extraHeaders,
 	}
 }

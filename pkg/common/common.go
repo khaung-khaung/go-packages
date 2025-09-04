@@ -3,13 +3,15 @@ package common
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/banyar/go-packages/pkg/entities"
+	"github.com/banyar/go-packages/pkg/frontlog"
+	"go.uber.org/zap"
 
 	"golang.org/x/exp/rand"
 )
@@ -23,12 +25,20 @@ func DisplayJsonFormat(message string, class interface{}) {
 	}
 	p, err := json.Marshal(class)
 	LogError(err)
-	log.Println(message+" ===>", string(p))
+
+	frontlog.Logger.Info(
+		message,
+		zap.Any("", p),
+	)
+
 }
 
 func LogError(err error) {
 	if err != nil {
-		log.Fatal("ERROR : ", err)
+		frontlog.Logger.Error(
+			"ERROR",
+			zap.Any(":", err),
+		)
 	}
 }
 
@@ -55,14 +65,67 @@ func EnsureOutputFolderExists(folderPath string) error {
 	return nil
 }
 
+type UnitConfig struct {
+	Prefix    string
+	Suffix    string
+	Separator string
+	AddRandom bool
+}
+
+func GenerateUnitName(data string, config UnitConfig) string {
+	timestampStr := TimestampString()
+
+	parts := []string{}
+
+	if config.Prefix != "" {
+		parts = append(parts, config.Prefix)
+	}
+
+	parts = append(parts, data)
+	parts = append(parts, timestampStr)
+
+	if config.Suffix != "" {
+		parts = append(parts, config.Suffix)
+	}
+
+	if config.AddRandom {
+		randomStr := GenerateRandomString(4)
+		parts = append(parts, randomStr)
+	}
+
+	separator := config.Separator
+	if separator == "" {
+		separator = "_"
+	}
+
+	return strings.Join(parts, separator)
+}
+
+func GenerateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
 func PreparePayload(data string) entities.CustomPublish {
 	// Payload
 	timestampStr := TimestampString()
-	fmt.Println("Timestamp String:", timestampStr)
-
+	config := UnitConfig{Prefix: "unit", Suffix: "prod", Separator: "-", AddRandom: true}
+	unitName := GenerateUnitName(data, config)
 	publish := entities.CustomPublish{
-		Name:  data,
-		Email: data + "@gmail.com",
+		Name:      fmt.Sprintf("user_%s_%s", unitName, timestampStr),
+		Email:     fmt.Sprintf("%s.%s@gmail.com", data, timestampStr),
+		Timestamp: timestampStr,
+		UserID:    fmt.Sprintf("usr_%d", time.Now().UnixNano()),
+		IsActive:  true,
+		CreatedAt: time.Now(),
+		Metadata: map[string]interface{}{
+			"source":  "dynamic_generator",
+			"version": "1.0",
+		},
 	}
 	return publish
 }
@@ -73,7 +136,10 @@ func TimestampString() string {
 
 func FailOnError(err error, msg string) {
 	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
+		frontlog.Logger.Error(
+			msg,
+			zap.Any(":", err),
+		)
 	}
 }
 
@@ -155,14 +221,21 @@ func GetDynamicPayLoad() interface{} {
 
 	// Create and set the struct
 	dynamicStruct := CreateAndSetStruct(fields, values)
-	fmt.Printf("Dynamic Struct: %+v\n", dynamicStruct)
+	frontlog.Logger.Info(
+		"Dynamic Struct:",
+		zap.Any("-", dynamicStruct),
+	)
+
 	return dynamicStruct
 }
 
 func GetDSNRabbitMQ() entities.DSNRabbitMQ {
 	rbqPort, err := strconv.Atoi(os.Getenv("RABBIT_MQ_PORT"))
 	if err != nil {
-		log.Fatalf("Error converting RBQ to integer: %v", err)
+		frontlog.Logger.Info(
+			"Error converting RBQ to integer:",
+			zap.Any("err", err),
+		)
 	}
 	return entities.DSNRabbitMQ{
 		Host:         os.Getenv("RABBIT_MQ_HOST"),
@@ -181,7 +254,10 @@ func GetDSNRabbitMQ() entities.DSNRabbitMQ {
 func GetDSNRabbitMQ1() entities.DSNRabbitMQ {
 	rbqPort, err := strconv.Atoi(os.Getenv("RABBIT_MQ_PORT1"))
 	if err != nil {
-		log.Fatalf("Error converting RBQ to integer: %v", err)
+		frontlog.Logger.Info(
+			"Error converting RBQ to integer:",
+			zap.Any("err", err),
+		)
 	}
 	return entities.DSNRabbitMQ{
 		Host:         os.Getenv("RABBIT_MQ_HOST"),
@@ -194,16 +270,4 @@ func GetDSNRabbitMQ1() entities.DSNRabbitMQ {
 		ExchangeType: os.Getenv("RABBIT_MQ_EXCHANGE_TYPE"),
 		ContentType:  os.Getenv("RABBIT_MQ_CONTENT_TYPE"),
 	}
-}
-
-func FormatJSON(message string, v interface{}) string {
-	b, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		log.Printf("Error formatting JSON: %v", err)
-		return fmt.Sprintf("Error formatting JSON: %v", err)
-	}
-
-	jsonString := string(b)
-	log.Printf(message+" Successfully formatted JSON:%s\n", jsonString)
-	return jsonString
 }
