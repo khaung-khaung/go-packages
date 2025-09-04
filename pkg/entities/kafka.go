@@ -1,5 +1,15 @@
 package entities
 
+type DSNKafka struct {
+	Brokers   string
+	Topics    string
+	GroupId   string
+	User      string
+	Password  string
+	Mechanism string
+	Protocol  string
+}
+
 type KafkaCommonDSN struct {
 	Brokers   string // Comma-separated list of broker addresses
 	ClientID  string // Client identifier
@@ -12,7 +22,7 @@ type KafkaCommonDSN struct {
 type KafkaProducerDSN struct {
 	KafkaCommonDSN        // Embedded common configuration
 	Acks           string // Acknowledgement mode (e.g., "all")
-	Retries        int    // Number of retries for failed sends
+	Retries        string // Number of retries for failed sends
 	Compression    string // Compression type (e.g., "snappy")
 }
 
@@ -20,5 +30,5 @@ type KafkaConsumerDSN struct {
 	KafkaCommonDSN        // Embedded common configuration
 	GroupID        string // Consumer group identifier
 	AutoOffset     string // Offset reset policy (e.g., "earliest")
-	AutoCommit     bool   // Enable/disable auto-commit of offsets
+	AutoCommit     string // Enable/disable auto-commit of offsets
 }

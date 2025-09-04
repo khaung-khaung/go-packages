@@ -2,10 +2,10 @@ package services
 
 import (
 	"context"
-	"fmt"
-	"log"
 
+	"github.com/banyar/go-packages/pkg/frontlog"
 	"github.com/banyar/go-packages/pkg/repositories"
+	"go.uber.org/zap"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -25,8 +25,7 @@ func (s *MongoService) GetClient() (*mongo.Client, error) {
 	// Check the connection
 	err := client.Ping(context.TODO(), nil)
 	if err != nil {
-		fmt.Printf("Error check connection to mongo client : error=%v", err)
-		log.Fatal(err)
+		frontlog.Logger.Error("Error check connection to mongo client :", zap.Any("error=", err))
 		return nil, err
 	}
 	return client, nil

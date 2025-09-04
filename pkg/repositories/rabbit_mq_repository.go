@@ -12,7 +12,9 @@ import (
 	"time"
 
 	entities "github.com/banyar/go-packages/pkg/entities"
+	"github.com/banyar/go-packages/pkg/frontlog"
 	"github.com/rabbitmq/amqp091-go"
+	"go.uber.org/zap"
 )
 
 func isNetworkError(err error) bool {
@@ -29,7 +31,7 @@ func isNetworkError(err error) bool {
 
 	// Check for io.EOF, which often signals a closed connection or stream
 	if errors.Is(err, io.EOF) {
-		return true
+		return trueKafkaCommonDSN
 	}
 
 	return false
@@ -66,15 +68,24 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 			break
 		} else {
 			if retryCount == 0 {
-				log.Printf("Failed to connect to RabbitMQ: %v", err)
+				frontlog.Logger.Error(
+				"Failed to connect to RabbitMQ",
+				zap.Any("error", err)
+			)
 			}
 			if !isNetworkError(err) {
-				log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+				frontlog.Logger.Error(
+					"Failed to connect to RabbitMQ",
+					zap.Any("error", err)
+				)
 			}
 		}
 
 		if retryCount == 6 {
-			log.Fatalln("RabbitMQ connection max retries reached")
+			frontlog.Logger.Error(
+				"RabbitMQ connection max retries reached",
+				zap.Int("retryCount", retryCount)
+			)
 		}
 		retryCount++
 
@@ -83,7 +94,7 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 		if delay > 16*time.Second {
 			delay = 16 * time.Second
 		}
-		log.Printf("Retry %d\n", retryCount)
+		frontlog.Logger.Info("RabbitMQ Retry",zap.Int("retryCount", retryCount))
 	}
 
 	repo := &RabbitMQRepository{
@@ -97,7 +108,11 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 	for i := 0; i < poolSize; i++ {
 		ch, err := repo.createChannel()
 		if err != nil {
-			log.Fatalf("Failed to initialize RabbitMQ channel %d: %v", i, err)
+			frontlog.Logger.Error(
+				"Failed to initialize RabbitMQ channel",
+				zap.Any("index", i),
+				zap.Any("error", err),
+			)
 		}
 		repo.channelPool <- ch
 	}
@@ -203,10 +218,16 @@ func (r *RabbitMQRepository) reconnectRBMQ() bool {
 	uri := fmt.Sprintf("amqp://%s:%s@%s:%d%s", user, pass, host, port, vhost)
 	retryCount := 1
 	delay := time.Second
-	log.Println("Reconnecting RabbitMQ")
+	frontlog.Logger.Info("Reconnecting RabbitMQ")
 
 	for {
 		log.Printf("Retry %d\n", retryCount)
+
+		frontlog.Logger.Error(
+				"Failed to initialize RabbitMQ channel",
+				zap.Any("index", i),
+				zap.Any("error", err),
+			)
 
 		// Reconnect
 		conn, err := amqp091.Dial(uri)

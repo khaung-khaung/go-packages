@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 
 	entities "github.com/banyar/go-packages/pkg/entities"
@@ -9,99 +11,64 @@ import (
 )
 
 type KafkaRepository struct {
-	producer *KafkaProducer // Use pointer
-	consumer *KafkaConsumer // Use pointer
+	producer *KafkaProducer
+	consumer *KafkaConsumer
 }
 
 type KafkaConsumer struct {
 	Client  *kafka.Consumer
 	Mu      sync.RWMutex
 	Running bool
-	Closed  chan struct{} // Add closed channel
+	Closed  chan struct{}
 }
 
 type KafkaProducer struct {
 	Client  *kafka.Producer
-	Running bool
 	Mu      sync.Mutex
+	Running bool
 }
 
-// ConnectKafka establishes connections using entity configurations
-func ConnectKafka(
-	producerDSN *entities.KafkaProducerDSN,
-	consumerDSN *entities.KafkaConsumerDSN,
-) (*KafkaRepository, error) {
+func ConnectKafka() *KafkaRepository {
+	return &KafkaRepository{}
+}
 
-	// Create producer config from entities
+func (kr *KafkaRepository) ConnectProducer(producerDSN *entities.KafkaProducerDSN) error {
 	producerConfig := createProducerConfig(producerDSN)
 	producer, err := kafka.NewProducer(producerConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create producer: %w", err)
+		return fmt.Errorf("producer creation failed: %w", err)
 	}
 
-	// Create consumer config from entities
+	kr.producer = &KafkaProducer{
+		Client:  producer,
+		Running: true,
+	}
+	return nil
+}
+
+func (kr *KafkaRepository) ConnectConsumer(consumerDSN *entities.KafkaConsumerDSN) error {
 	consumerConfig := createConsumerConfig(consumerDSN)
 	consumer, err := kafka.NewConsumer(consumerConfig)
 	if err != nil {
-		producer.Close()
-		return nil, fmt.Errorf("failed to create consumer: %w", err)
+		return fmt.Errorf("consumer creation failed: %w", err)
 	}
 
-	return &KafkaRepository{
-		producer: &KafkaProducer{
-			Client:  producer,
-			Running: true,
-		},
-		consumer: &KafkaConsumer{
-			Client:  consumer,
-			Running: true,
-			Closed:  make(chan struct{}), // Initialize closed channel
-
-		},
-	}, nil
-}
-
-func (r *KafkaRepository) Producer() *KafkaProducer {
-	return r.producer
-}
-
-func (r *KafkaRepository) Consumer() *KafkaConsumer {
-	return r.consumer
-}
-
-// Helper functions to create configs from entity structs
-func createProducerConfig(dsn *entities.KafkaProducerDSN) *kafka.ConfigMap {
-	return &kafka.ConfigMap{
-		"bootstrap.servers": dsn.Brokers,
-		"client.id":         dsn.ClientID,
-		"security.protocol": dsn.Protocol,
-		"sasl.mechanism":    dsn.Mechanism,
-		"sasl.username":     dsn.Username,
-		"sasl.password":     dsn.Password,
-		"acks":              dsn.Acks,
-		"retries":           dsn.Retries,
-		"compression.type":  dsn.Compression,
+	kr.consumer = &KafkaConsumer{
+		Client:  consumer,
+		Running: true,
+		Closed:  make(chan struct{}),
 	}
+	return nil
 }
 
-func createConsumerConfig(dsn *entities.KafkaConsumerDSN) *kafka.ConfigMap {
-	return &kafka.ConfigMap{
-		"bootstrap.servers":  dsn.Brokers,
-		"group.id":           dsn.GroupID,
-		"client.id":          dsn.ClientID,
-		"security.protocol":  dsn.Protocol,
-		"sasl.mechanism":     dsn.Mechanism,
-		"sasl.username":      dsn.Username,
-		"sasl.password":      dsn.Password,
-		"auto.offset.reset":  dsn.AutoOffset,
-		"enable.auto.commit": false,
-	}
-}
-
-// Close safely shuts down connections
 func (kr *KafkaRepository) ProducerClose() {
+	if kr.producer == nil {
+		return
+	}
+
 	kr.producer.Mu.Lock()
 	defer kr.producer.Mu.Unlock()
+
 	if kr.producer.Running {
 		kr.producer.Client.Close()
 		kr.producer.Running = false
@@ -109,12 +76,83 @@ func (kr *KafkaRepository) ProducerClose() {
 }
 
 func (kr *KafkaRepository) ConsumerClose() {
+	if kr.consumer == nil {
+		return
+	}
+
 	kr.consumer.Mu.Lock()
 	defer kr.consumer.Mu.Unlock()
 
 	if kr.consumer.Running {
-		close(kr.consumer.Closed) // Signal closure
+		close(kr.consumer.Closed)
 		kr.consumer.Client.Close()
 		kr.consumer.Running = false
+	}
+}
+
+// Getter Producer methods
+func (kr *KafkaRepository) GetProducer() *KafkaProducer {
+	return kr.producer
+}
+
+// Getter Consumer methods
+func (kr *KafkaRepository) GetConsumer() *KafkaConsumer {
+	return kr.consumer
+}
+
+// Helper functions to create configs from entity structs
+func createProducerConfig(dsn *entities.KafkaProducerDSN) *kafka.ConfigMap {
+
+	retries, err := strconv.Atoi(dsn.Retries)
+	if err != nil {
+		// Set default value if conversion fails or empty
+		retries = 3 // Default retry count
+	}
+
+	return &kafka.ConfigMap{
+		"bootstrap.servers": dsn.Brokers,
+		"client.id":         getWithDefault(dsn.ClientID, "default-consumer"),
+		"security.protocol": getWithDefault(dsn.Protocol, "PLAINTEXT"),
+		"sasl.mechanism":    dsn.Mechanism,
+		"sasl.username":     dsn.Username,
+		"sasl.password":     dsn.Password,
+		"acks":              getWithDefault(dsn.Acks, "all"),
+		"retries":           retries,
+		"compression.type":  getWithDefault(dsn.Compression, "snappy"),
+	}
+}
+
+func createConsumerConfig(dsn *entities.KafkaConsumerDSN) *kafka.ConfigMap {
+	return &kafka.ConfigMap{
+		"bootstrap.servers":  dsn.Brokers,
+		"group.id":           dsn.GroupID,
+		"client.id":          getWithDefault(dsn.ClientID, "default-consumer"),
+		"security.protocol":  getWithDefault(dsn.Protocol, "PLAINTEXT"),
+		"sasl.mechanism":     dsn.Mechanism,
+		"sasl.username":      dsn.Username,
+		"sasl.password":      dsn.Password,
+		"auto.offset.reset":  getWithDefault(dsn.AutoOffset, "earliest"),
+		"enable.auto.commit": getEnvAsBool(dsn.AutoCommit, false),
+	}
+}
+
+func getWithDefault(key, defaultValue string) string {
+	val := key
+	if val == "" {
+		return defaultValue
+	}
+	return val
+}
+
+// Helper function for boolean environment variables
+func getEnvAsBool(key string, defaultValue bool) bool {
+	val := strings.ToLower(key)
+	switch val {
+	case "true", "1", "yes", "on":
+		return true
+	case "false", "0", "no", "off":
+		return false
+	default:
+		return defaultValue
 	}
 }
