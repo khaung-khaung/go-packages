@@ -69,12 +69,14 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 				log.Printf("Failed to connect to RabbitMQ: %v", err)
 			}
 			if !isNetworkError(err) {
-				log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+				log.Printf("Failed to connect to RabbitMQ: %v", err)
+				return nil
 			}
 		}
 
 		if retryCount == 6 {
-			log.Fatalln("RabbitMQ connection max retries reached")
+			log.Println("RabbitMQ connection max retries reached")
+			return nil
 		}
 		retryCount++
 
@@ -97,7 +99,8 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 	for i := 0; i < poolSize; i++ {
 		ch, err := repo.createChannel()
 		if err != nil {
-			log.Fatalf("Failed to initialize RabbitMQ channel %d: %v", i, err)
+			log.Printf("Failed to initialize RabbitMQ channel %d: %v", i, err)
+			return nil
 		}
 		repo.channelPool <- ch
 	}
