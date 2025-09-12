@@ -12,4 +12,5 @@ type DSNRabbitMQ struct {
 	ContentType   string
 	StatusMessage string
 	VirtualHost   string
+	Timeout       int
 }
