@@ -21,8 +21,6 @@ func TestKafkaProduce(t *testing.T) {
 
 	producerDSN := common.ProducerDSNFromEnv()
 
-	defer logger.Sync()
-
 	// logger.Info("Producing test message...", zap.Any("", producerDSN))
 
 	// Create adapter with error handling
