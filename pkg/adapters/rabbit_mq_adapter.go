@@ -16,6 +16,9 @@ type RabbitMQAdapter struct {
 
 func NewRabbitMQAdapter(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQAdapter {
 	rbqRepo := repositories.ConnectRabbitMQ(DSNRBQ, poolSize)
+	if rbqRepo == nil {
+		return nil
+	}
 	return &RabbitMQAdapter{
 		RabbitMQService: services.NewRabbitMQService(rbqRepo),
 		Conn:            rbqRepo.Conn,

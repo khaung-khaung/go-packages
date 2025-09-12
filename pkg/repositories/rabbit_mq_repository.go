@@ -60,6 +60,7 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 	var err error
 
 	// Connect to server
+	t1 := time.Now()
 	for {
 		conn, err = amqp091.Dial(uri)
 		if err == nil {
@@ -69,20 +70,24 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 				log.Printf("Failed to connect to RabbitMQ: %v", err)
 			}
 			if !isNetworkError(err) {
-				log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+				log.Printf("Failed to connect to RabbitMQ: %v", err)
+				return nil
 			}
 		}
 
-		if retryCount == 6 {
-			log.Fatalln("RabbitMQ connection max retries reached")
+		t2 := time.Now()
+		dt := int(t2.Sub(t1).Seconds())
+		if dt > DSNRBQ.Timeout {
+			log.Println("RabbitMQ connection timeout")
+			return nil
 		}
-		retryCount++
 
 		time.Sleep(delay)
 		delay *= 2
 		if delay > 16*time.Second {
 			delay = 16 * time.Second
 		}
+		retryCount++
 		log.Printf("Retry %d\n", retryCount)
 	}
 
@@ -97,7 +102,8 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 	for i := 0; i < poolSize; i++ {
 		ch, err := repo.createChannel()
 		if err != nil {
-			log.Fatalf("Failed to initialize RabbitMQ channel %d: %v", i, err)
+			log.Printf("Failed to initialize RabbitMQ channel %d: %v", i, err)
+			return nil
 		}
 		repo.channelPool <- ch
 	}
@@ -205,6 +211,7 @@ func (r *RabbitMQRepository) reconnectRBMQ() bool {
 	delay := time.Second
 	log.Println("Reconnecting RabbitMQ")
 
+	t1 := time.Now()
 	for {
 		log.Printf("Retry %d\n", retryCount)
 
@@ -227,17 +234,20 @@ func (r *RabbitMQRepository) reconnectRBMQ() bool {
 			return true
 		}
 
-		if retryCount == 6 {
+		t2 := time.Now()
+		dt := int(t2.Sub(t1).Seconds())
+		if dt > r.dsnRBQ.Timeout {
+			log.Println("RabbitMQ connection timeout")
 			atomic.StoreInt32(&r.netErrFlag, 1)
 			return false
 		}
-		retryCount++
 
 		delay *= 2
 		if delay > 16*time.Second {
 			delay = 16 * time.Second
 		}
 		time.Sleep(delay)
+		retryCount++
 	}
 }
 
