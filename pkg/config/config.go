@@ -33,6 +33,7 @@ func init() {
 
 	fmt.Println("config.init()")
 	AppName = os.Getenv("APP_NAME")
+
 }
 
 func GetMailTemplete() *template.Template {
