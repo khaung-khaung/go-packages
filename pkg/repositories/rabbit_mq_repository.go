@@ -31,7 +31,7 @@ func isNetworkError(err error) bool {
 
 	// Check for io.EOF, which often signals a closed connection or stream
 	if errors.Is(err, io.EOF) {
-		return trueKafkaCommonDSN
+		return true
 	}
 
 	return false
@@ -69,14 +69,14 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 		} else {
 			if retryCount == 0 {
 				frontlog.Logger.Error(
-				"Failed to connect to RabbitMQ",
-				zap.Any("error", err)
-			)
+					"Failed to connect to RabbitMQ",
+					zap.Any("error", err),
+				)
 			}
 			if !isNetworkError(err) {
 				frontlog.Logger.Error(
 					"Failed to connect to RabbitMQ",
-					zap.Any("error", err)
+					zap.Any("error", err),
 				)
 			}
 		}
@@ -84,7 +84,7 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 		if retryCount == 6 {
 			frontlog.Logger.Error(
 				"RabbitMQ connection max retries reached",
-				zap.Int("retryCount", retryCount)
+				zap.Int("retryCount", retryCount),
 			)
 		}
 		retryCount++
@@ -94,7 +94,7 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 		if delay > 16*time.Second {
 			delay = 16 * time.Second
 		}
-		frontlog.Logger.Info("RabbitMQ Retry",zap.Int("retryCount", retryCount))
+		frontlog.Logger.Info("RabbitMQ Retry", zap.Int("retryCount", retryCount))
 	}
 
 	repo := &RabbitMQRepository{
@@ -221,13 +221,6 @@ func (r *RabbitMQRepository) reconnectRBMQ() bool {
 	frontlog.Logger.Info("Reconnecting RabbitMQ")
 
 	for {
-		log.Printf("Retry %d\n", retryCount)
-
-		frontlog.Logger.Error(
-				"Failed to initialize RabbitMQ channel",
-				zap.Any("index", i),
-				zap.Any("error", err),
-			)
 
 		// Reconnect
 		conn, err := amqp091.Dial(uri)
