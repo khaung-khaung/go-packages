@@ -21,7 +21,6 @@ require (
 
 require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.10.0
-	github.com/google/uuid v1.6.0
 	github.com/rabbitmq/amqp091-go v1.10.0
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3
 )

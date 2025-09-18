@@ -12,7 +12,6 @@ import (
 	"time"
 
 	entities "github.com/banyar/go-packages/pkg/entities"
-	"github.com/google/uuid"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -300,7 +299,6 @@ func (r *RabbitMQRepository) PostMessage(payloadObj any, headers map[string]any)
 				Headers:      headers,
 				Body:         payload,
 				DeliveryMode: 2,
-				MessageId:    uuid.New().String(),
 			},
 		)
 		if err != nil {
@@ -321,9 +319,6 @@ func (r *RabbitMQRepository) PostMessage(payloadObj any, headers map[string]any)
 }
 
 func (r *RabbitMQRepository) ConsumerLoop(fn func(*amqp091.Delivery) bool) {
-	lastProcessed := make([]string, r.consumerWorkerCount)
-	var mu sync.Mutex
-
 	for {
 		for {
 			time.Sleep(100 * time.Millisecond)
@@ -375,29 +370,11 @@ func (r *RabbitMQRepository) ConsumerLoop(fn func(*amqp091.Delivery) bool) {
 				defer wg.Done()
 				defer func() { <-limiter }()
 
-				isNew := true
-				var ack bool
-				if recovery {
-					if msg.MessageId != "" {
-						mu.Lock()
-						for j := 0; j < r.consumerWorkerCount; j++ {
-							if msg.MessageId == lastProcessed[j] {
-								isNew = false
-							}
-						}
-						mu.Unlock()
-					}
-				}
-				if isNew {
-					ack = fn(msg)
-				}
+				ack := fn(msg)
 				switch atomic.LoadInt32(&r.netErrFlag) {
 				case networkStateFailed:
 					return
 				case networkStateConnecting:
-					mu.Lock()
-					lastProcessed[i] = msg.MessageId
-					mu.Unlock()
 					return
 				}
 
@@ -412,9 +389,6 @@ func (r *RabbitMQRepository) ConsumerLoop(fn func(*amqp091.Delivery) bool) {
 				if err != nil {
 					if isTransientError(err) {
 						if r.reconnectRBMQ() {
-							mu.Lock()
-							lastProcessed[i] = msg.MessageId
-							mu.Unlock()
 							return
 						}
 					}
