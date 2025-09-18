@@ -93,8 +93,8 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 
 		time.Sleep(delay)
 		delay *= 2
-		if delay > 32*time.Second {
-			delay = 32 * time.Second
+		if delay > 16*time.Second {
+			delay = 16 * time.Second
 		}
 		retryCount++
 		log.Printf("Retry %d\n", retryCount)
