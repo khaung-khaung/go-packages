@@ -9,21 +9,23 @@ import (
 
 	"github.com/banyar/go-packages/pkg/adapters"
 	"github.com/banyar/go-packages/pkg/common"
+	"github.com/banyar/go-packages/pkg/frontlog"
 	"github.com/banyar/go-packages/pkg/repositories"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"go.uber.org/zap"
 )
 
 func TestKafkaConsume(t *testing.T) {
-	producerDSN := common.ProducerDSNFromEnv()
 	consumerDSN := common.ConsumerDSNFromEnv()
 
-	kafkaAdapter := adapters.NewKafkaAdapter(producerDSN, consumerDSN)
+	kafkaAdapter := adapters.NewKafkaAdapter()
 	defer kafkaAdapter.KafkaRepo.ConsumerClose()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	consumer := kafkaAdapter.KafkaRepo.Consumer()
+	kafkaAdapter.KafkaRepo.ConnectConsumer(consumerDSN)
+	consumer := kafkaAdapter.KafkaRepo.GetConsumer()
 
 	// Use wait group for proper synchronization
 	var wg sync.WaitGroup
@@ -62,7 +64,7 @@ func Consume(kc *repositories.KafkaConsumer, ctx context.Context, topic string) 
 	kc.Mu.Unlock()
 
 	if err != nil {
-		log.Printf("Subscribe error: %v", err)
+		frontlog.Logger.Error("Subscribe error: :", zap.Any("", err))
 		return
 	}
 
@@ -71,10 +73,11 @@ func Consume(kc *repositories.KafkaConsumer, ctx context.Context, topic string) 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Context cancelled - stopping consumer")
+			frontlog.Logger.Info("Context cancelled - stopping consumer")
 			return
 		case <-kc.Closed: // Listen to closure signal
-			log.Println("Consumer closed - stopping")
+			frontlog.Logger.Info("Consumer closed - stopping")
+
 			return
 		default:
 			kc.Mu.RLock()
@@ -89,7 +92,7 @@ func Consume(kc *repositories.KafkaConsumer, ctx context.Context, topic string) 
 			go func(e kafka.Event) {
 				defer func() {
 					if r := recover(); r != nil {
-						log.Printf("Recovered from panic: %v", r)
+						frontlog.Logger.Info("Recovered from panic:", zap.Any("", r))
 					}
 				}()
 

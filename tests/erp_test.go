@@ -2,13 +2,7 @@ package tests
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
-	"os"
 	"testing"
-
-	"github.com/banyar/go-packages/pkg/adapters"
-	"github.com/banyar/go-packages/pkg/common"
 )
 
 type ERPPlanDetail struct {
@@ -53,43 +47,43 @@ func (d *ERPPlanDetail) UnmarshalJSON(data []byte) error {
 }
 
 func TestPlanSummary(t *testing.T) {
-	cid := "SCP000012"
-	rangeOption := "[0,10]"
+	// cid := "SCP000012"
+	// rangeOption := "[0,10]"
 
-	baseURL := os.Getenv("ERP_BASE_URL")
-	apiToken := os.Getenv("ERP_TOKEN")
-	apiUrl := fmt.Sprintf("%s/subscriptions?range=%s&filter={\"device_id\":\"%s\"}", baseURL, rangeOption, cid)
+	// baseURL := os.Getenv("ERP_BASE_URL")
+	// apiToken := os.Getenv("ERP_TOKEN")
+	// apiUrl := fmt.Sprintf("%s/subscriptions?range=%s&filter={\"device_id\":\"%s\"}", baseURL, rangeOption, cid)
 
-	httpAdapter := adapters.NewHttpAdapter(apiUrl, apiToken)
-	fmt.Println("apiUrl", httpAdapter.BaseURL)
-	fmt.Println("apiToken", httpAdapter.Token)
+	// httpAdapter := adapters.NewHttpAdapter(apiUrl, apiToken)
+	// fmt.Println("apiUrl", httpAdapter.BaseURL)
+	// fmt.Println("apiToken", httpAdapter.Token)
 
-	resp, err := httpAdapter.HttpService.Get()
-	if err != nil {
-		log.Fatal("ERROR : ", err)
-	}
-	common.DisplayJsonFormat("rest2Adapter", resp)
+	// resp, err := httpAdapter.HttpService.Get()
+	// if err != nil {
+	// 	log.Fatal("ERROR : ", err)
+	// }
+	// common.DisplayJsonFormat("rest2Adapter", resp)
 }
 
-func TestPlanDetail(t *testing.T) {
-	serviceId := "2061125-001"
+// func TestPlanDetail(t *testing.T) {
+// 	serviceId := "2061125-001"
 
-	baseURL := os.Getenv("ERP_BASE_URL")
-	apiToken := os.Getenv("ERP_TOKEN")
-	apiUrl := fmt.Sprintf("%s/subscriptions/%s", baseURL, serviceId)
-	httpAdapter := adapters.NewHttpAdapter(apiUrl, apiToken)
-	fmt.Println("apiUrl", httpAdapter.BaseURL)
-	fmt.Println("apiToken", httpAdapter.Token)
+// 	baseURL := os.Getenv("ERP_BASE_URL")
+// 	apiToken := os.Getenv("ERP_TOKEN")
+// 	apiUrl := fmt.Sprintf("%s/subscriptions/%s", baseURL, serviceId)
+// 	httpAdapter := adapters.NewHttpAdapter(apiUrl, apiToken)
+// 	fmt.Println("apiUrl", httpAdapter.BaseURL)
+// 	fmt.Println("apiToken", httpAdapter.Token)
 
-	resp, err := httpAdapter.HttpService.Get()
-	if err != nil {
-		log.Fatal("ERROR : ", err)
-	}
-	var planDetail *ERPPlanDetail
-	if err := json.Unmarshal([]byte(resp.Message), &planDetail); err != nil {
-		log.Println("Error parsing JSON:", err)
+// 	resp, err := httpAdapter.HttpService.Get()
+// 	if err != nil {
+// 		log.Fatal("ERROR : ", err)
+// 	}
+// 	var planDetail *ERPPlanDetail
+// 	if err := json.Unmarshal([]byte(resp.Message), &planDetail); err != nil {
+// 		log.Println("Error parsing JSON:", err)
 
-	}
+// 	}
 
-	common.DisplayJsonFormat("rest2Adapter", planDetail)
-}
+// 	common.DisplayJsonFormat("rest2Adapter", planDetail)
+// }

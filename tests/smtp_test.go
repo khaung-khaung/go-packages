@@ -10,7 +10,27 @@ import (
 	"github.com/banyar/go-packages/pkg/adapters"
 	"github.com/banyar/go-packages/pkg/config"
 	"github.com/banyar/go-packages/pkg/entities"
+	"github.com/banyar/go-packages/pkg/frontlog"
+	"go.uber.org/zap"
 )
+
+func TestLoadConfig(t *testing.T) {
+	cfg := config.LoadConfig()
+	if cfg == nil {
+		t.Error("Expected configuration to be loaded, got nil")
+	}
+
+	// Initialize logger
+	logConfig, logLevel := cfg.GetLoggingConfig()
+	if err := frontlog.InitLogger(logConfig, logLevel); err != nil {
+		panic("failed to initialize logger: " + err.Error())
+	}
+	defer frontlog.Logger.Sync()
+
+	// // Now use the logger anywhere in your app
+	frontlog.Logger.Info("Application started", zap.Any("", logConfig))
+
+}
 
 func TestSMTPSend(t *testing.T) {
 

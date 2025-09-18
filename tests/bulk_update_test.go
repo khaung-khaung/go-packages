@@ -2,14 +2,14 @@ package tests
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"testing"
 
 	"github.com/banyar/go-packages/pkg/adapters"
 	"github.com/banyar/go-packages/pkg/entities"
+	"github.com/banyar/go-packages/pkg/frontlog"
+	"go.uber.org/zap"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -21,7 +21,7 @@ func TestBulkUpdateFailures(t *testing.T) {
 
 	mongoPort, err := strconv.Atoi(os.Getenv("MONGO_POST"))
 	if err != nil {
-		log.Fatalf("Error converting MONGO_PORT to integer: %v", err)
+		frontlog.Logger.Error("Error converting MONGO_PORT to integer :", zap.Any("error=", err))
 	}
 	DSNMongo := entities.DSNMongo{
 		Host:     os.Getenv("MONGO_HOST"),
@@ -33,12 +33,13 @@ func TestBulkUpdateFailures(t *testing.T) {
 
 	// print("End Adding the User Roles.");
 	client := adapters.NewMongoAdapter(&DSNMongo)
-	fmt.Println("client Adapter ===> ", client)
+
+	frontlog.Logger.Info("client Adapter :", zap.Any("", client))
 	collection, err := client.MongoService.GetCollection("node")
-	fmt.Println("collection  ", collection)
+	frontlog.Logger.Info("collection :", zap.Any("", collection))
 
 	if err != nil {
-		fmt.Println("error  ", err)
+		frontlog.Logger.Error("Error :", zap.Any("", err))
 	}
 
 	var existingTags []string
@@ -46,7 +47,7 @@ func TestBulkUpdateFailures(t *testing.T) {
 
 	objectID, err := primitive.ObjectIDFromHex("5f8db962890fab91e6467a5e")
 	if err != nil {
-		fmt.Println("error  ", err)
+		frontlog.Logger.Error("Error :", zap.Any("", err))
 	}
 
 	update := bson.M{"$set": bson.M{"node_attr.tags": existingTags}}
@@ -92,7 +93,10 @@ func TestBulkUpdateFailures(t *testing.T) {
 			if (err != nil) != tt.expectedError {
 				t.Errorf("BulkWrite() error = %v, expectedError %v", err, tt.expectedError)
 			}
-			fmt.Println("tests  ", result.MatchedCount, result.ModifiedCount)
+			frontlog.Logger.Info("tests :",
+				zap.Any("", result.MatchedCount),
+				zap.Any("", result.ModifiedCount),
+			)
 		})
 	}
 }

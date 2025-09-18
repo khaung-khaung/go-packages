@@ -5,24 +5,26 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/banyar/go-packages/pkg/adapters"
 	"github.com/banyar/go-packages/pkg/common"
+	"github.com/banyar/go-packages/pkg/frontlog"
 	"github.com/banyar/go-packages/pkg/repositories"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"go.uber.org/zap"
 )
 
 func TestKafkaProduce(t *testing.T) {
 
 	producerDSN := common.ProducerDSNFromEnv()
-	consumerDSN := common.ConsumerDSNFromEnv()
+
+	// logger.Info("Producing test message...", zap.Any("", producerDSN))
 
 	// Create adapter with error handling
-	kafkaAdapter := adapters.NewKafkaAdapter(producerDSN, consumerDSN)
+	kafkaAdapter := adapters.NewKafkaAdapter()
 
 	// Defer close immediately after successful creation
 	defer func() {
@@ -30,9 +32,9 @@ func TestKafkaProduce(t *testing.T) {
 	}()
 
 	// Access producer safely
-	producerClient := kafkaAdapter.KafkaRepo.Producer()
+	kafkaAdapter.KafkaRepo.ConnectProducer(producerDSN)
+	producer := kafkaAdapter.KafkaRepo.GetProducer()
 
-	// Example usage
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -46,7 +48,7 @@ func TestKafkaProduce(t *testing.T) {
 	// Produce messages to topic (asynchronously)
 	payload, err := json.Marshal(payloadObj)
 	if err != nil {
-		log.Fatalf("Error converting struct to JSON: %s", err)
+		frontlog.Logger.Error("Error converting struct to JSON", zap.Any(":", err))
 	}
 	jsonString := string(payload)
 
@@ -56,9 +58,10 @@ func TestKafkaProduce(t *testing.T) {
 		{Key: "Event-Type", Value: []byte("order.created")},
 	}
 
-	err = SendMessage(producerClient, ctx, os.Getenv("KAFKA_TOPIC"), []byte(jsonString), headers)
+	err = SendMessage(producer, ctx, os.Getenv("KAFKA_TOPIC"), []byte(jsonString), headers)
 	if err != nil {
-		log.Printf("Failed to send message: %v", err)
+
+		frontlog.Logger.Error("Failed to send message", zap.Any(":", err))
 	}
 
 }
@@ -98,7 +101,9 @@ func SendMessage(kp *repositories.KafkaProducer, ctx context.Context, topic stri
 		if msg.TopicPartition.Error != nil {
 			return fmt.Errorf("delivery failed: %w", msg.TopicPartition.Error)
 		}
-		log.Printf("Delivered message to %v", msg.TopicPartition)
+
+		frontlog.Logger.Info("", zap.Any("Delivered message", msg.TopicPartition))
+
 		return nil
 	}
 }

@@ -19,7 +19,6 @@ func NewHttpService(http *repositories.HttpRepository) *HttpService {
 }
 
 func (s *HttpService) Get() (*entities.HttpResponse, error) {
-
 	req, err := s.HTTP.GetHttpRequest(http.MethodGet, nil)
 	if err != nil {
 		fmt.Println("ERROR", err.Error())

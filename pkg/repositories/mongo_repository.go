@@ -3,9 +3,10 @@ package repositories
 import (
 	"context"
 	"fmt"
-	"log"
 
 	entities "github.com/banyar/go-packages/pkg/entities"
+	"github.com/banyar/go-packages/pkg/frontlog"
+	"go.uber.org/zap"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -27,15 +28,19 @@ func ConnectMongo(DSNMongo *entities.DSNMongo) *MongoRepository {
 	// Connect to MongoDB
 	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
-		fmt.Printf("Error connecting to mongo database : error=%v", err)
-		log.Fatal(err)
+		frontlog.Logger.Error(
+			"Error check connection to mongo database:",
+			zap.Any("err", err.Error()),
+		)
 	}
 
 	// Check the connection
 	err = client.Ping(context.TODO(), nil)
 	if err != nil {
-		fmt.Printf("Error check connection to mongo client : error=%v", err)
-		log.Fatal(err)
+		frontlog.Logger.Error(
+			"Error check connection to mongo client:",
+			zap.Any("err", err.Error()),
+		)
 	}
 
 	return &MongoRepository{
