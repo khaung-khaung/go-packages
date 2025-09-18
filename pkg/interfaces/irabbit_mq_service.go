@@ -1,5 +1,8 @@
 package interfaces
 
+import "github.com/rabbitmq/amqp091-go"
+
 type IRabbitMQService interface {
-	Produce(payload interface{}, headers map[string]interface{}) (int, string)
+	Produce(payload any, headers map[string]any) (int, string)
+	Consume(fn func(*amqp091.Delivery) bool)
 }

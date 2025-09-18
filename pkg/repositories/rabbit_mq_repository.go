@@ -12,37 +12,46 @@ import (
 	"time"
 
 	entities "github.com/banyar/go-packages/pkg/entities"
+	"github.com/google/uuid"
 	"github.com/rabbitmq/amqp091-go"
 )
 
-func isNetworkError(err error) bool {
-	// Check if the underlying connection/channel is gone.
+func isTransientError(err error) bool {
 	if errors.Is(err, amqp091.ErrClosed) {
 		return true
 	}
-
-	// Check for network-related errors
+	var amqpErr *amqp091.Error
+	if errors.As(err, &amqpErr) {
+		if amqpErr.Code == 501 {
+			return true
+		}
+	}
 	var netErr net.Error
 	if errors.As(err, &netErr) {
 		return true
 	}
-
-	// Check for io.EOF, which often signals a closed connection or stream
 	if errors.Is(err, io.EOF) {
 		return true
 	}
-
 	return false
 }
 
+const (
+	networkStateDisconnected = iota
+	networkStateConnected
+	networkStateConnecting
+	networkStateFailed
+)
+
 type RabbitMQRepository struct {
-	Conn        *amqp091.Connection
-	dsnRBQ      *entities.DSNRabbitMQ
-	channelPool chan *amqp091.Channel
-	maxPoolSize int
-	mu          sync.Mutex
-	netErrFlag  int32
-	connID      int32
+	Conn                *amqp091.Connection
+	dsnRBQ              *entities.DSNRabbitMQ
+	channelPool         chan *amqp091.Channel
+	maxPoolSize         int
+	consumerWorkerCount int
+	mu                  sync.Mutex
+	netErrFlag          int32
+	connID              int32
 }
 
 // Initialize the repository with a connection and channel pool
@@ -69,7 +78,7 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 			if retryCount == 0 {
 				log.Printf("Failed to connect to RabbitMQ: %v", err)
 			}
-			if !isNetworkError(err) {
+			if !isTransientError(err) {
 				log.Printf("Failed to connect to RabbitMQ: %v", err)
 				return nil
 			}
@@ -92,14 +101,15 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 	}
 
 	repo := &RabbitMQRepository{
-		Conn:        conn,
-		dsnRBQ:      DSNRBQ,
-		maxPoolSize: poolSize,
+		Conn:                conn,
+		dsnRBQ:              DSNRBQ,
+		maxPoolSize:         poolSize,
+		consumerWorkerCount: poolSize,
 	}
 
 	// Initialize channels
 	repo.channelPool = make(chan *amqp091.Channel, poolSize)
-	for i := 0; i < poolSize; i++ {
+	for i := range poolSize {
 		ch, err := repo.createChannel()
 		if err != nil {
 			log.Printf("Failed to initialize RabbitMQ channel %d: %v", i, err)
@@ -107,6 +117,7 @@ func ConnectRabbitMQ(DSNRBQ *entities.DSNRabbitMQ, poolSize int) *RabbitMQReposi
 		}
 		repo.channelPool <- ch
 	}
+	repo.netErrFlag = networkStateConnected
 
 	return repo
 }
@@ -182,13 +193,13 @@ func (r *RabbitMQRepository) reconnectRBMQ() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if id != atomic.LoadInt32(&r.connID) {
-		if atomic.LoadInt32(&r.netErrFlag) == 1 {
+		if atomic.LoadInt32(&r.netErrFlag) == networkStateFailed {
 			return false
 		} else {
 			return true
 		}
 	}
-	atomic.StoreInt32(&r.netErrFlag, 2)
+	atomic.StoreInt32(&r.netErrFlag, networkStateConnecting)
 	time.Sleep(time.Second)
 
 	// Disconnect
@@ -199,7 +210,7 @@ func (r *RabbitMQRepository) reconnectRBMQ() bool {
 		}
 		r.Conn.Close()
 	}
-	defer atomic.AddInt32(&r.connID, 1)
+	defer atomic.AddInt32(&r.connID, networkStateFailed)
 
 	host := r.dsnRBQ.Host
 	port := r.dsnRBQ.Port
@@ -224,13 +235,13 @@ func (r *RabbitMQRepository) reconnectRBMQ() bool {
 			for i := 0; i < r.maxPoolSize; i++ {
 				ch, err := r.createChannel()
 				if err != nil {
-					atomic.StoreInt32(&r.netErrFlag, 1)
+					atomic.StoreInt32(&r.netErrFlag, networkStateFailed)
 					return false
 				}
 
 				r.channelPool <- ch
 			}
-			atomic.StoreInt32(&r.netErrFlag, 0)
+			atomic.StoreInt32(&r.netErrFlag, networkStateConnected)
 			return true
 		}
 
@@ -238,7 +249,7 @@ func (r *RabbitMQRepository) reconnectRBMQ() bool {
 		dt := int(t2.Sub(t1).Seconds())
 		if dt > r.dsnRBQ.Timeout {
 			log.Println("RabbitMQ connection timeout")
-			atomic.StoreInt32(&r.netErrFlag, 1)
+			atomic.StoreInt32(&r.netErrFlag, networkStateFailed)
 			return false
 		}
 
@@ -252,20 +263,20 @@ func (r *RabbitMQRepository) reconnectRBMQ() bool {
 }
 
 // Post a message to the queue
-func (r *RabbitMQRepository) PostMessage(payloadObj interface{}, headers map[string]interface{}) (int, string) {
+func (r *RabbitMQRepository) PostMessage(payloadObj any, headers map[string]any) (int, string) {
 	payload, err := json.Marshal(payloadObj)
 	if err != nil {
 		return 500, "Error converting struct to JSON"
 	}
 
 	switch atomic.LoadInt32(&r.netErrFlag) {
-	case 1:
+	case networkStateFailed:
 		log.Println("RabbitMQ disconnected")
 		return 500, "RabbitMQ disconnected"
-	case 2:
+	case networkStateConnecting:
 		r.mu.Lock()
 		r.mu.Unlock()
-		if atomic.LoadInt32(&r.netErrFlag) == 1 {
+		if atomic.LoadInt32(&r.netErrFlag) == networkStateFailed {
 			log.Println("RabbitMQ disconnected")
 			return 500, "RabbitMQ disconnected"
 		}
@@ -289,11 +300,12 @@ func (r *RabbitMQRepository) PostMessage(payloadObj interface{}, headers map[str
 				Headers:      headers,
 				Body:         payload,
 				DeliveryMode: 2,
+				MessageId:    uuid.New().String(),
 			},
 		)
 		if err != nil {
 			log.Printf("Failed to publish message to RabbitMQ: %v\n", err)
-			if isNetworkError(err) {
+			if isTransientError(err) {
 				if ok := r.reconnectRBMQ(); ok {
 					continue
 				}
@@ -306,4 +318,166 @@ func (r *RabbitMQRepository) PostMessage(payloadObj interface{}, headers map[str
 		break
 	}
 	return 200, "Sent successfully"
+}
+
+func (r *RabbitMQRepository) ConsumerLoop(fn func(*amqp091.Delivery) bool) {
+	lastProcessed := make([]string, r.consumerWorkerCount)
+	var mu sync.Mutex
+
+	for {
+		for {
+			time.Sleep(100 * time.Millisecond)
+			flag := atomic.LoadInt32(&r.netErrFlag)
+			if flag == networkStateConnected {
+				break
+			} else if flag == networkStateFailed {
+				return
+			}
+		}
+
+		ch, err := r.declareQueue()
+		if err != nil {
+			if isTransientError(err) {
+				if r.reconnectRBMQ() {
+					continue
+				}
+			} else {
+				return
+			}
+		}
+
+		msgs, err := ch.Consume(
+			r.dsnRBQ.Queue,
+			"",
+			false,
+			false,
+			false,
+			false,
+			nil,
+		)
+		if err != nil {
+			if isTransientError(err) {
+				if r.reconnectRBMQ() {
+					continue
+				}
+			}
+			log.Printf("Failed to consume message: %v", err)
+			break
+		}
+		var wg sync.WaitGroup
+		limiter := make(chan struct{}, r.consumerWorkerCount)
+		index := 0
+		recovery := true
+		for d := range msgs {
+			limiter <- struct{}{}
+			wg.Add(1)
+			go func(i int, msg *amqp091.Delivery) {
+				defer wg.Done()
+				defer func() { <-limiter }()
+
+				isNew := true
+				var ack bool
+				if recovery {
+					if msg.MessageId != "" {
+						mu.Lock()
+						for j := 0; j < r.consumerWorkerCount; j++ {
+							if msg.MessageId == lastProcessed[j] {
+								isNew = false
+							}
+						}
+						mu.Unlock()
+					}
+				}
+				if isNew {
+					ack = fn(msg)
+				}
+				switch atomic.LoadInt32(&r.netErrFlag) {
+				case networkStateFailed:
+					return
+				case networkStateConnecting:
+					mu.Lock()
+					lastProcessed[i] = msg.MessageId
+					mu.Unlock()
+					return
+				}
+
+				// Acknowledge
+				var err error
+				if ack {
+					err = d.Ack(false)
+				} else {
+					err = d.Nack(false, true)
+				}
+
+				if err != nil {
+					if isTransientError(err) {
+						if r.reconnectRBMQ() {
+							mu.Lock()
+							lastProcessed[i] = msg.MessageId
+							mu.Unlock()
+							return
+						}
+					}
+					log.Printf("Failed to acknowledge message: %v", err)
+					return
+				}
+			}(index, &d)
+			index++
+			if index == r.consumerWorkerCount {
+				if recovery {
+					wg.Wait()
+					recovery = false
+				}
+				index = 0
+			}
+		}
+		wg.Wait()
+	}
+}
+
+func (r *RabbitMQRepository) declareQueue() (*amqp091.Channel, error) {
+	delay := 4 * time.Second
+	for {
+		ch, err := r.Conn.Channel()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create channel: %w", err)
+		}
+		_, err = ch.QueueDeclare(
+			r.dsnRBQ.Queue,
+			true,
+			false,
+			false,
+			false,
+			nil,
+		)
+		if err != nil {
+			ch.Close()
+			return nil, fmt.Errorf("failed to declare queue: %w", err)
+		}
+
+		err = ch.QueueBind(
+			r.dsnRBQ.Queue,
+			"",
+			r.dsnRBQ.Exchange,
+			false,
+			nil,
+		)
+		if err != nil {
+			var amqpErr *amqp091.Error
+			if errors.As(err, &amqpErr) && amqpErr.Code == 404 {
+				log.Printf("Failed to bind with exchange: %v", err)
+				time.Sleep(delay)
+				continue
+			}
+			ch.Close()
+			return nil, fmt.Errorf("failed to bind queue: %w", err)
+		}
+
+		err = ch.Qos(r.consumerWorkerCount, 0, true)
+		if err != nil {
+			ch.Close()
+			return nil, fmt.Errorf("failed to set queue qos: %w", err)
+		}
+		return ch, nil
+	}
 }

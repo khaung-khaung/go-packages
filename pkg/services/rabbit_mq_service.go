@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/banyar/go-packages/pkg/repositories"
+	"github.com/rabbitmq/amqp091-go"
 )
 
 type rabbitMQService struct {
@@ -14,6 +15,10 @@ func NewRabbitMQService(rbqRepo *repositories.RabbitMQRepository) *rabbitMQServi
 	}
 }
 
-func (r *rabbitMQService) Produce(payload interface{}, headers map[string]interface{}) (int, string) {
+func (r *rabbitMQService) Produce(payload any, headers map[string]any) (int, string) {
 	return r.RabbitMQRepo.PostMessage(payload, headers)
+}
+
+func (r *rabbitMQService) Consume(fn func(*amqp091.Delivery) bool) {
+	r.RabbitMQRepo.ConsumerLoop(fn)
 }
