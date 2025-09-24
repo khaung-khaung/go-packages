@@ -1,0 +1,34 @@
+
+func createConfig() *kafka.ConfigMap {
+	// return &kafka.ConfigMap{
+	// 	"bootstrap.servers":  os.Getenv("KAFKA_HOST"),
+	// 	"client.id":          os.Getenv("KAFKA_GROUP_ID"),
+	// 	"security.protocol":  os.Getenv("KAFKA_PROTOCOL"),
+	// 	"sasl.mechanism":     os.Getenv("KAFKA_MECHANISM"),
+	// 	"sasl.username":      os.Getenv("KAFKA_USER"),
+	// 	"sasl.password":      os.Getenv("KAFKA_PASSWORD"),
+	// 	"group.id":           os.Getenv("KAFKA_GROUP_ID"),
+	// 	"auto.offset.reset":  "earliest",
+	// 	"enable.auto.commit": false,
+	// }
+
+	return &kafka.ConfigMap{
+		"bootstrap.servers":               os.Getenv("KAFKA_HOST"),
+		"client.id":                       os.Getenv("KAFKA_GROUP_ID"),
+		"security.protocol":               os.Getenv("KAFKA_PROTOCOL"),
+		"sasl.mechanism":                  os.Getenv("KAFKA_MECHANISM"),
+		"sasl.username":                   os.Getenv("KAFKA_USER"),
+		"sasl.password":                   os.Getenv("KAFKA_PASSWORD"),
+		"group.id":                        os.Getenv("KAFKA_GROUP_ID"),
+		"auto.offset.reset":               "earliest",
+		"go.application.rebalance.enable": true,
+		"enable.auto.commit":              false,
+		"session.timeout.ms":              10000,
+		"heartbeat.interval.ms":           3000,
+		"broker.address.family":           "v4",
+		"api.version.request.timeout.ms":  5000,
+		"metadata.max.age.ms":             10000,
+		"socket.timeout.ms":               10000,
+	}
+
+}
