@@ -127,33 +127,6 @@ func (r *RabbitMQRepository) createChannel() (*amqp091.Channel, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Declare exchange
-	err = ch.ExchangeDeclare(
-		r.dsnRBQ.Exchange,
-		r.dsnRBQ.ExchangeType,
-		true,  // durable
-		false, // auto-deleted
-		false, // internal
-		false, // no-wait
-		nil,   // arguments
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Declare queue
-	if len(r.dsnRBQ.Queue) > 0 {
-		_, err = ch.QueueDeclare(
-			r.dsnRBQ.Queue,
-			true,
-			false,
-			false,
-			false,
-			nil,
-		)
-	}
-
 	return ch, err
 }
 
@@ -287,7 +260,16 @@ func (r *RabbitMQRepository) PostMessage(payloadObj any, headers map[string]any)
 		if err != nil {
 			return 500, err.Error()
 		}
-
+		err = r.declareExchange(ch)
+		if err != nil {
+			log.Printf("Failed to publish message to RabbitMQ: %v\n", err)
+			if isTransientError(err) {
+				if ok := r.reconnectRBMQ(); ok {
+					continue
+				}
+			}
+			return 500, err.Error()
+		}
 		// Publish message
 		err = ch.Publish(
 			r.dsnRBQ.Exchange,
@@ -409,6 +391,20 @@ func (r *RabbitMQRepository) ConsumerLoop(fn func(*amqp091.Delivery) bool) {
 	}
 }
 
+func (r *RabbitMQRepository) declareExchange(ch *amqp091.Channel) error {
+	// Declare exchange
+	err := ch.ExchangeDeclare(
+		r.dsnRBQ.Exchange,
+		r.dsnRBQ.ExchangeType,
+		true,  // durable
+		false, // auto-deleted
+		false, // internal
+		false, // no-wait
+		nil,   // arguments
+	)
+	return err
+}
+
 func (r *RabbitMQRepository) declareQueue() (*amqp091.Channel, error) {
 	delay := 4 * time.Second
 	for {
@@ -431,7 +427,7 @@ func (r *RabbitMQRepository) declareQueue() (*amqp091.Channel, error) {
 
 		err = ch.QueueBind(
 			r.dsnRBQ.Queue,
-			"",
+			r.dsnRBQ.RoutingKey,
 			r.dsnRBQ.Exchange,
 			false,
 			nil,
