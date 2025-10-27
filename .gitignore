@@ -1,0 +1,7 @@
+# Environment variables file
+.env
+
+# Go Download workspace files
+downloads/dump
+
+
