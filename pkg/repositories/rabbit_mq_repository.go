@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -367,10 +368,23 @@ func (r *RabbitMQRepository) ConsumerLoop(fn func(*amqp091.Delivery) bool) {
 			limiter <- struct{}{}
 			wg.Add(1)
 			go func(i int, msg *amqp091.Delivery) {
-				defer wg.Done()
-				defer func() { <-limiter }()
+				finalized := false
+
+				defer func() {
+					wg.Done()
+					<-limiter
+				}()
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("Goroutine %d panicked: %v\n%s", i, r, debug.Stack())
+						if !finalized {
+							msg.Ack(false)
+						}
+					}
+				}()
 
 				ack := fn(msg)
+				finalized = true
 				switch atomic.LoadInt32(&r.netErrFlag) {
 				case networkStateFailed:
 					return
@@ -381,9 +395,9 @@ func (r *RabbitMQRepository) ConsumerLoop(fn func(*amqp091.Delivery) bool) {
 				// Acknowledge
 				var err error
 				if ack {
-					err = d.Ack(false)
+					err = msg.Ack(false)
 				} else {
-					err = d.Nack(false, true)
+					err = msg.Nack(false, true)
 				}
 
 				if err != nil {
