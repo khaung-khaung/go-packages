@@ -14,6 +14,31 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// prettyWriteSyncer wraps a WriteSyncer to pretty-print JSON output
+type prettyWriteSyncer struct {
+	zapcore.WriteSyncer
+}
+
+func (p *prettyWriteSyncer) Write(b []byte) (n int, err error) {
+	// Try to parse as JSON
+	var jsonData map[string]interface{}
+	if err := json.Unmarshal(b, &jsonData); err != nil {
+		// If not valid JSON, write as-is
+		return p.WriteSyncer.Write(b)
+	}
+
+	// Pretty-print the JSON with indentation
+	prettyJSON, err := json.MarshalIndent(jsonData, "", "   ")
+	if err != nil {
+		// If formatting fails, write original
+		return p.WriteSyncer.Write(b)
+	}
+
+	// Add newline at the end
+	prettyJSON = append(prettyJSON, '\n')
+	return p.WriteSyncer.Write(prettyJSON)
+}
+
 var Logger *zap.Logger
 
 type LogConfig struct {
@@ -45,8 +70,8 @@ func InitLogger(fileConfig LogConfig, level string) error {
 
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
 
-	// Create output writers
-	writers := []zapcore.WriteSyncer{zapcore.AddSync(os.Stdout)}
+	// Create output writers with pretty-printing
+	writers := []zapcore.WriteSyncer{&prettyWriteSyncer{zapcore.AddSync(os.Stdout)}}
 
 	if fileConfig.Enabled {
 		filePath, err := renderLogPath(fileConfig.Name, fileConfig.TimestampInName)
@@ -62,7 +87,7 @@ func InitLogger(fileConfig LogConfig, level string) error {
 		if err != nil {
 			return err
 		}
-		writers = append(writers, zapcore.AddSync(file))
+		writers = append(writers, &prettyWriteSyncer{zapcore.AddSync(file)})
 	}
 
 	core := zapcore.NewCore(
@@ -140,4 +165,124 @@ func renderLogPath(tmpl string, includeTimestamp bool) (string, error) {
 // GetLogger returns the global logger instance
 func GetLogger() *zap.Logger {
 	return Logger
+}
+
+// LogNested logs a message with a nested object as a proper JSON field
+func LogNested(level, msg, fieldName string, obj interface{}) {
+	if Logger == nil {
+		return
+	}
+
+	field := zap.Any(fieldName, obj)
+
+	switch level {
+	case "debug":
+		Logger.Debug(msg, field)
+	case "info":
+		Logger.Info(msg, field)
+	case "warn":
+		Logger.Warn(msg, field)
+	case "error":
+		Logger.Error(msg, field)
+	default:
+		Logger.Info(msg, field)
+	}
+}
+
+// LogNestedFields logs a message with multiple nested objects as JSON fields
+func LogNestedFields(level, msg string, fields map[string]interface{}) {
+	if Logger == nil {
+		return
+	}
+
+	zapFields := make([]zap.Field, 0, len(fields))
+	for key, value := range fields {
+		zapFields = append(zapFields, zap.Any(key, value))
+	}
+
+	switch level {
+	case "debug":
+		Logger.Debug(msg, zapFields...)
+	case "info":
+		Logger.Info(msg, zapFields...)
+	case "warn":
+		Logger.Warn(msg, zapFields...)
+	case "error":
+		Logger.Error(msg, zapFields...)
+	default:
+		Logger.Info(msg, zapFields...)
+	}
+}
+
+// LogNestedJSON logs a message with nested JSON string
+func LogNestedJSON(level, msg, fieldName, jsonStr string) {
+	if Logger == nil {
+		return
+	}
+
+	var obj interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &obj); err != nil {
+		Logger.Error("Failed to parse JSON string", zap.Error(err))
+		return
+	}
+
+	LogNested(level, msg, fieldName, obj)
+}
+
+// InfoNested logs an info message with a nested object
+func InfoNested(msg, fieldName string, obj interface{}) {
+	LogNested("info", msg, fieldName, obj)
+}
+
+// DebugNested logs a debug message with a nested object
+func DebugNested(msg, fieldName string, obj interface{}) {
+	LogNested("debug", msg, fieldName, obj)
+}
+
+// WarnNested logs a warning message with a nested object
+func WarnNested(msg, fieldName string, obj interface{}) {
+	LogNested("warn", msg, fieldName, obj)
+}
+
+// ErrorNested logs an error message with a nested object
+func ErrorNested(msg, fieldName string, obj interface{}) {
+	LogNested("error", msg, fieldName, obj)
+}
+
+// LogStructured logs a message with structured nested data
+func LogStructured(level, msg string, data interface{}) {
+	if Logger == nil {
+		return
+	}
+
+	// Marshal to JSON and back to ensure proper nested structure
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		Logger.Error("Failed to marshal structured data", zap.Error(err))
+		return
+	}
+
+	var structuredData map[string]interface{}
+	if err := json.Unmarshal(jsonData, &structuredData); err != nil {
+		Logger.Error("Failed to unmarshal structured data", zap.Error(err))
+		return
+	}
+
+	fields := make([]zap.Field, 0, len(structuredData))
+	for key, value := range structuredData {
+		fields = append(fields, zap.Any(key, value))
+	}
+
+	switch level {
+	case "debug":
+		Logger.Debug(msg, fields...)
+	case "info":
+		Logger.Info(msg, fields...)
+	case "warn":
+		Logger.Warn(msg, fields...)
+	case "error":
+		Logger.Error(msg, fields...)
+	default:
+		Logger.Info(msg, fields...)
+	}
 }

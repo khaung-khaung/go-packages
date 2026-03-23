@@ -1,7 +1,6 @@
 package common
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -23,14 +22,9 @@ func DisplayJsonFormat(message string, class interface{}) {
 	if message == "" {
 		message = "CLASS"
 	}
-	p, err := json.Marshal(class)
-	LogError(err)
 
-	frontlog.Logger.Info(
-		message,
-		zap.Any("", p),
-	)
-
+	// Use the new nested logging for proper JSON formatting
+	frontlog.InfoNested(message, "data", class)
 }
 
 func LogError(err error) {

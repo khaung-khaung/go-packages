@@ -1,3 +1,6 @@
+//go:build cgo
+// +build cgo
+
 package interfaces
 
 type IKafkaService interface {
