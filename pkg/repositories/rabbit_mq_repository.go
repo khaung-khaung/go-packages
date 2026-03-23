@@ -445,7 +445,7 @@ func (r *RabbitMQRepository) declareQueue() (*amqp091.Channel, error) {
 
 		err = ch.QueueBind(
 			r.dsnRBQ.Queue,
-			"",
+			r.dsnRBQ.RoutingKey,
 			r.dsnRBQ.Exchange,
 			false,
 			nil,
